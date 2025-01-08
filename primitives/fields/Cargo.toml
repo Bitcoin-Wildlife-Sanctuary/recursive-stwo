@@ -1,0 +1,9 @@
+[package]
+name = "circle-plonk-dsl-fields"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+stwo-prover.workspace = true
+circle-plonk-dsl-constraint-system = { path = "../../dsl/constraint_system" }
+num-traits.workspace = true

@@ -1,0 +1,15 @@
+[package]
+name = "circle-plonk-dsl-hints"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+circle-plonk-lib.workspace = true
+stwo-prover.workspace = true
+serde.workspace = true
+bincode.workspace = true
+num-traits.workspace = true
+itertools.workspace = true
+poseidon2-m31.workspace = true
+indexmap.workspace = true
+serde_json.workspace = true

@@ -1,0 +1,10 @@
+[package]
+name = "circle-plonk-dsl-poseidon31"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+circle-plonk-dsl-constraint-system = { path = "../../dsl/constraint_system" }
+stwo-prover.workspace = true
+num-traits.workspace = true
+circle-plonk-dsl-fields = { path = "../fields" }

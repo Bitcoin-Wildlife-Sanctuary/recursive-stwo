@@ -1,0 +1,9 @@
+[package]
+name = "circle-plonk-dsl-fiat-shamir"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+stwo-prover.workspace = true
+serde.workspace = true
+circle-plonk-dsl-hints = { path = "../hints" }
