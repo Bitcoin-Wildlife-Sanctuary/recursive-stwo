@@ -1,11 +1,9 @@
 use crate::ConstraintSystemRef;
-use serde::de::DeserializeOwned;
-use serde::Serialize;
 
 pub trait DVar: Clone {
     /// The type of the "native" value that `Self` represents in the constraint
     /// system.
-    type Value: core::fmt::Debug + Eq + Clone + Serialize + DeserializeOwned;
+    type Value: Clone;
 
     /// Returns the underlying `ConstraintSystemRef`.
     fn cs(&self) -> ConstraintSystemRef;

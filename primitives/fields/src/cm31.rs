@@ -34,6 +34,17 @@ impl AllocVar for CM31Var {
     }
 }
 
+impl From<&M31Var> for CM31Var {
+    fn from(var: &M31Var) -> Self {
+        let cs = var.cs();
+        Self {
+            value: CM31::from(var.value),
+            real: var.clone(),
+            imag: M31Var::zero(&cs),
+        }
+    }
+}
+
 impl Add<&M31Var> for &CM31Var {
     type Output = CM31Var;
 

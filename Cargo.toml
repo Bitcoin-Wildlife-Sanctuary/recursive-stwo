@@ -2,12 +2,12 @@
 resolver = "2"
 members = [
     "dsl/constraint_system", "primitives/poseidon31", "primitives/fields", "primitives/channel",
-    "components/hints", "components/fiat_shamir"
+    "components/hints", "components/fiat_shamir", "primitives/bits", "primitives/circle"
 ]
 
 [workspace.dependencies]
 serde = { version = "1.0.217", features = ["derive"] }
-stwo-prover = { git = "https://github.com/starkware-libs/stwo" }
+stwo-prover = { git = "https://github.com/Bitcoin-Wildlife-Sanctuary/stwo-circle-poseidon-plonk/", branch = "circle-plonk-poseidon" }
 num-traits = "0.2.19"
 poseidon2-m31 = { git = "https://github.com/Bitcoin-Wildlife-Sanctuary/poseidon2-m31.git" }
 rand = "0.8.5"

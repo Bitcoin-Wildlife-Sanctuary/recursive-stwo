@@ -35,6 +35,17 @@ impl AllocVar for QM31Var {
     }
 }
 
+impl From<&M31Var> for QM31Var {
+    fn from(var: &M31Var) -> Self {
+        let cs = var.cs();
+        Self {
+            value: QM31::from(var.value),
+            first: CM31Var::from(var),
+            second: CM31Var::zero(&cs),
+        }
+    }
+}
+
 impl Add<&M31Var> for &QM31Var {
     type Output = QM31Var;
 
@@ -254,8 +265,8 @@ impl QM31Var {
 
     pub fn equalverify(&self, rhs: &QM31Var) {
         assert_eq!(self.value, rhs.value);
-        self.first.eq(&rhs.first);
-        self.second.eq(&rhs.second);
+        self.first.equalverify(&rhs.first);
+        self.second.equalverify(&rhs.second);
     }
 
     pub fn inv(&self) -> QM31Var {
