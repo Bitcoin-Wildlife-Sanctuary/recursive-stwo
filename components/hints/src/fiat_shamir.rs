@@ -149,8 +149,7 @@ impl FiatShamirHints {
             .map(|domain| domain.log_size())
             .max()
             .unwrap();
-        let queries_parents =
-            query_positions_per_log_size[&max_first_layer_column_log_size].clone();
+        let queries = query_positions_per_log_size[&max_first_layer_column_log_size].clone();
 
         FiatShamirHints {
             preprocessed_commitment: proof.stark_proof.commitments[0],
@@ -168,7 +167,7 @@ impl FiatShamirHints {
             inner_layer_commitments,
             last_layer_evaluation,
             fri_alphas,
-            queries: queries_parents,
+            queries,
         }
     }
 }
