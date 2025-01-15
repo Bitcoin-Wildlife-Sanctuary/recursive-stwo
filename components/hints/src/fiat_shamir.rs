@@ -1,5 +1,6 @@
 use itertools::Itertools;
 use num_traits::{One, Zero};
+use std::collections::BTreeSet;
 use stwo_prover::constraint_framework::{Relation, PREPROCESSED_TRACE_IDX};
 use stwo_prover::core::air::Components;
 use stwo_prover::core::channel::{Channel, Poseidon31Channel};
@@ -33,6 +34,7 @@ pub struct FiatShamirHints {
     pub inner_layer_commitments: Vec<Poseidon31Hash>,
     pub last_layer_evaluation: SecureField,
     pub fri_alphas: Vec<SecureField>,
+    pub queries: Vec<usize>,
 }
 
 impl FiatShamirHints {
@@ -109,7 +111,7 @@ impl FiatShamirHints {
             .collect_vec();
 
         // FRI commitment phase on OODS quotients.
-        let fri_verifier = FriVerifier::<Poseidon31MerkleChannel>::commit(
+        let mut fri_verifier = FriVerifier::<Poseidon31MerkleChannel>::commit(
             channel,
             config.fri_config,
             proof.stark_proof.fri_proof.clone(),
@@ -135,7 +137,20 @@ impl FiatShamirHints {
         }
         let nonce = proof.stark_proof.proof_of_work;
         channel.mix_u64(nonce);
-        println!("{:?}", channel.digest());
+
+        assert!(channel.trailing_zeros() >= config.pow_bits);
+
+        // Get FRI query positions.
+        let query_positions_per_log_size = fri_verifier.sample_query_positions(channel);
+        let max_first_layer_column_log_size = fri_verifier
+            .first_layer
+            .column_commitment_domains
+            .iter()
+            .map(|domain| domain.log_size())
+            .max()
+            .unwrap();
+        let queries_parents =
+            query_positions_per_log_size[&max_first_layer_column_log_size].clone();
 
         FiatShamirHints {
             preprocessed_commitment: proof.stark_proof.commitments[0],
@@ -153,6 +168,7 @@ impl FiatShamirHints {
             inner_layer_commitments,
             last_layer_evaluation,
             fri_alphas,
+            queries: queries_parents,
         }
     }
 }

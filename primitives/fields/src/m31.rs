@@ -130,4 +130,24 @@ impl M31Var {
             variable,
         }
     }
+
+    pub fn is_eq(&self, rhs: &M31Var) -> M31Var {
+        (self - rhs).is_zero()
+    }
+
+    pub fn is_zero(&self) -> M31Var {
+        let cs = self.cs();
+        let inv = M31Var::new_witness(&self.cs, &{
+            if self.value.is_zero() {
+                M31::zero()
+            } else {
+                self.value.inverse()
+            }
+        });
+        let out = &(self * &inv).neg() + &M31Var::one(&cs);
+        let expected_zero = self * &out;
+        expected_zero.equalverify(&M31Var::zero(&cs));
+
+        out
+    }
 }

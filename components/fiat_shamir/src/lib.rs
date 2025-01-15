@@ -1,11 +1,12 @@
 use crate::data_structures::{PlonkWithAcceleratorLookupElementsVar, PlonkWithPoseidonProofVar};
-use circle_plonk_dsl_bits::BitsVar;
+use circle_plonk_dsl_bits::{get_lower_bits_checked, BitsVar};
 use circle_plonk_dsl_channel::{ChannelVar, HashVar};
 use circle_plonk_dsl_circle::CirclePointQM31Var;
 use circle_plonk_dsl_constraint_system::dvar::DVar;
-use circle_plonk_dsl_fields::{CM31Var, QM31Var};
+use circle_plonk_dsl_fields::{CM31Var, M31Var, QM31Var};
 use circle_plonk_dsl_hints::FiatShamirHints;
 use num_traits::Zero;
+use std::cmp::max;
 use stwo_prover::core::fields::cm31::CM31;
 use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::fields::qm31::QM31;
@@ -25,6 +26,7 @@ pub struct FiatShamirResults {
     pub random_coeff: QM31Var,
     pub after_sampled_values_random_coeff: QM31Var,
     pub oods_point: CirclePointQM31Var,
+    pub queries: Vec<M31Var>,
 }
 
 impl FiatShamirResults {
@@ -107,7 +109,48 @@ impl FiatShamirResults {
         let _ = BitsVar::from_m31(&proof.stark_proof.proof_of_work[2], 21);
 
         channel.absorb_one_felt_and_permute(&nonce_felt);
-        println!("{:?}", channel.digest.value);
+
+        let lower_bits = get_lower_bits_checked(&channel.digest.to_m31()[0], 20);
+        lower_bits.equalverify(&M31Var::zero(&cs));
+
+        let mut raw_queries = Vec::with_capacity(16);
+        let mut draw_queries_felts = Vec::with_capacity(4);
+        {
+            let [a, b] = channel.get_felts();
+            draw_queries_felts.push(a);
+            draw_queries_felts.push(b);
+            let [a, b] = channel.get_felts();
+            draw_queries_felts.push(a);
+            draw_queries_felts.push(b);
+        }
+        for felt in draw_queries_felts.iter() {
+            raw_queries.push(felt.first.real.clone());
+            raw_queries.push(felt.first.imag.clone());
+            raw_queries.push(felt.second.real.clone());
+            raw_queries.push(felt.second.imag.clone());
+        }
+
+        let mut queries = Vec::with_capacity(16);
+        let max_column_log_size = max(
+            proof.stmt0.log_size_plonk.value.0 + 1,
+            proof.stmt0.log_size_poseidon.value.0 + 2,
+        ) + 5;
+        for raw_query in raw_queries.iter() {
+            queries.push(get_lower_bits_checked(
+                raw_query,
+                max_column_log_size as usize,
+            ));
+        }
+
+        // assumption: no duplicated queries in the first attempt
+        let mut sorted_queries = vec![];
+        for query in queries.iter() {
+            sorted_queries.push(query.value.0 as usize);
+        }
+        sorted_queries.sort_unstable();
+        sorted_queries.dedup();
+        assert_eq!(sorted_queries.len(), 16);
+        assert_eq!(sorted_queries, fiat_shamir_hints.queries);
 
         assert_eq!(lookup_elements.z.value, fiat_shamir_hints.z);
         assert_eq!(lookup_elements.alpha.value, fiat_shamir_hints.alpha);
@@ -139,6 +182,7 @@ impl FiatShamirResults {
             random_coeff,
             after_sampled_values_random_coeff,
             oods_point,
+            queries,
         }
     }
 }

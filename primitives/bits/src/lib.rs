@@ -64,3 +64,24 @@ impl BitsVar {
         res
     }
 }
+
+pub fn get_lower_bits_checked(v: &M31Var, n: usize) -> M31Var {
+    let cs = v.cs();
+
+    let high_bits = M31Var::new_witness(&cs, &M31::from(v.value.0 >> n));
+    let _ = BitsVar::from_m31(&high_bits, 31 - n);
+
+    let high_bits_shifted = high_bits.mul_constant(M31::from(1 << n));
+    let lower_bits = v - &high_bits_shifted;
+
+    let _ = BitsVar::from_m31(&lower_bits, n);
+
+    let is_high_bits_all_1 =
+        high_bits.is_eq(&M31Var::new_constant(&cs, &M31::from((1 << (31 - n)) - 1)));
+    let is_low_bits_all_1 = lower_bits.is_eq(&M31Var::new_constant(&cs, &M31::from((1 << n) - 1)));
+
+    let no_corner_case = &is_high_bits_all_1 * &is_low_bits_all_1;
+    no_corner_case.equalverify(&M31Var::zero(&cs));
+
+    lower_bits
+}
