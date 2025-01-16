@@ -239,10 +239,11 @@ impl PlonkWithAcceleratorLookupElementsVar {
         let [z, alpha] = channel.get_felts();
 
         let mut alpha_powers = Vec::with_capacity(9);
+        alpha_powers.push(QM31Var::one(&cs));
         alpha_powers.push(alpha.clone());
 
         let mut cur = alpha.clone();
-        for _ in 1..9 {
+        for _ in 2..9 {
             cur = &cur * &alpha;
             alpha_powers.push(cur.clone());
         }

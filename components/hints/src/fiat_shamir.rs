@@ -1,8 +1,7 @@
 use itertools::Itertools;
 use num_traits::{One, Zero};
-use std::collections::BTreeSet;
 use stwo_prover::constraint_framework::{Relation, PREPROCESSED_TRACE_IDX};
-use stwo_prover::core::air::Components;
+use stwo_prover::core::air::{Component, Components};
 use stwo_prover::core::channel::{Channel, Poseidon31Channel};
 use stwo_prover::core::circle::CirclePoint;
 use stwo_prover::core::fields::m31::M31;
@@ -10,7 +9,7 @@ use stwo_prover::core::fields::qm31::SecureField;
 use stwo_prover::core::fields::secure_column::SECURE_EXTENSION_DEGREE;
 use stwo_prover::core::fields::FieldExpOps;
 use stwo_prover::core::fri::{CirclePolyDegreeBound, FriVerifier};
-use stwo_prover::core::pcs::{CommitmentSchemeVerifier, PcsConfig};
+use stwo_prover::core::pcs::{CommitmentSchemeVerifier, PcsConfig, TreeSubspan};
 use stwo_prover::core::vcs::poseidon31_hash::Poseidon31Hash;
 use stwo_prover::core::vcs::poseidon31_merkle::{Poseidon31MerkleChannel, Poseidon31MerkleHasher};
 use stwo_prover::examples::plonk_with_poseidon::air::{
@@ -35,6 +34,12 @@ pub struct FiatShamirHints {
     pub last_layer_evaluation: SecureField,
     pub fri_alphas: Vec<SecureField>,
     pub queries: Vec<usize>,
+
+    pub plonk_tree_subspan: Vec<TreeSubspan>,
+    pub poseidon_tree_subspan: Vec<TreeSubspan>,
+
+    pub plonk_prepared_column_indices: Vec<usize>,
+    pub poseidon_prepared_column_indices: Vec<usize>,
 }
 
 impl FiatShamirHints {
@@ -66,6 +71,11 @@ impl FiatShamirHints {
             PlonkWithPoseidonComponents::new(&proof.stmt0, &lookup_elements, &proof.stmt1);
         let one_sum: SecureField = lookup_elements.combine(&[M31::one(), M31::one()]);
 
+        let plonk_tree_subspan = components.plonk.trace_locations().to_vec();
+        let plonk_prepared_column_indices = components.plonk.preproccessed_column_indices();
+        let poseidon_tree_subspan = components.poseidon.trace_locations().to_vec();
+        let poseidon_prepared_column_indices = components.poseidon.preproccessed_column_indices();
+
         let total_sum =
             proof.stmt1.plonk_total_sum - one_sum.inverse() + proof.stmt1.poseidon_total_sum;
         assert_eq!(total_sum, SecureField::zero());
@@ -89,6 +99,15 @@ impl FiatShamirHints {
 
         // Draw OODS point.
         let oods_point = CirclePoint::<SecureField>::get_random_point(channel);
+
+        println!(
+            "{:?}",
+            components.eval_composition_polynomial_at_point(
+                oods_point,
+                &proof.stark_proof.sampled_values,
+                random_coeff,
+            )
+        );
 
         // Get mask sample points relative to oods point.
         let mut sample_points = components.mask_points(oods_point);
@@ -168,6 +187,10 @@ impl FiatShamirHints {
             last_layer_evaluation,
             fri_alphas,
             queries,
+            plonk_tree_subspan,
+            poseidon_tree_subspan,
+            plonk_prepared_column_indices,
+            poseidon_prepared_column_indices,
         }
     }
 }

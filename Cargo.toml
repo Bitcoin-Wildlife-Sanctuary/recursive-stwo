@@ -2,7 +2,8 @@
 resolver = "2"
 members = [
     "dsl/constraint_system", "primitives/poseidon31", "primitives/fields", "primitives/channel",
-    "components/hints", "components/fiat_shamir", "primitives/bits", "primitives/circle"
+    "components/hints", "components/fiat_shamir", "components/composition", "components/data_structures",
+    "primitives/bits", "primitives/circle"
 ]
 
 [workspace.dependencies]

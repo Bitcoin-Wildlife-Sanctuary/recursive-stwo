@@ -4,6 +4,7 @@ use circle_plonk_dsl_constraint_system::ConstraintSystemRef;
 use circle_plonk_dsl_fields::{M31Var, QM31Var};
 use std::ops::{Add, Neg};
 use stwo_prover::core::circle::CirclePoint;
+use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::fields::qm31::SecureField;
 
 #[derive(Clone)]
@@ -49,5 +50,21 @@ impl CirclePointQM31Var {
     pub fn from_channel(channel: &mut ChannelVar) -> Self {
         let [t, _] = channel.get_felts();
         Self::from_t(&t)
+    }
+}
+
+impl Add<&CirclePoint<M31>> for &CirclePointQM31Var {
+    type Output = CirclePointQM31Var;
+
+    fn add(self, rhs: &CirclePoint<M31>) -> Self::Output {
+        let x1x2 = self.x.mul_constant_m31(rhs.x);
+        let y1y2 = self.y.mul_constant_m31(rhs.y);
+        let x1y2 = self.x.mul_constant_m31(rhs.y);
+        let y1x2 = self.y.mul_constant_m31(rhs.x);
+
+        let new_x = &x1x2 - &y1y2;
+        let new_y = &x1y2 + &y1x2;
+
+        CirclePointQM31Var { x: new_x, y: new_y }
     }
 }

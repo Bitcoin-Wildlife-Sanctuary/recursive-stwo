@@ -1,8 +1,10 @@
-use crate::data_structures::{PlonkWithAcceleratorLookupElementsVar, PlonkWithPoseidonProofVar};
 use circle_plonk_dsl_bits::{get_lower_bits_checked, BitsVar};
 use circle_plonk_dsl_channel::{ChannelVar, HashVar};
 use circle_plonk_dsl_circle::CirclePointQM31Var;
 use circle_plonk_dsl_constraint_system::dvar::DVar;
+use circle_plonk_dsl_data_structures::{
+    PlonkWithAcceleratorLookupElementsVar, PlonkWithPoseidonProofVar,
+};
 use circle_plonk_dsl_fields::{CM31Var, M31Var, QM31Var};
 use circle_plonk_dsl_hints::FiatShamirHints;
 use num_traits::Zero;
@@ -11,8 +13,6 @@ use stwo_prover::core::fields::cm31::CM31;
 use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::fields::qm31::QM31;
 use stwo_prover::core::fields::FieldExpOps;
-
-pub mod data_structures;
 
 pub struct FiatShamirResults {
     pub preprocessed_commitment: HashVar,
@@ -189,10 +189,10 @@ impl FiatShamirResults {
 
 #[cfg(test)]
 mod test {
-    use crate::data_structures::PlonkWithPoseidonProofVar;
     use crate::FiatShamirResults;
     use circle_plonk_dsl_constraint_system::dvar::AllocVar;
     use circle_plonk_dsl_constraint_system::ConstraintSystemRef;
+    use circle_plonk_dsl_data_structures::PlonkWithPoseidonProofVar;
     use circle_plonk_dsl_hints::FiatShamirHints;
     use stwo_prover::core::fri::FriConfig;
     use stwo_prover::core::pcs::PcsConfig;

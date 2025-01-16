@@ -326,4 +326,40 @@ impl QM31Var {
             second,
         }
     }
+
+    pub fn shift_by_i(&self) -> QM31Var {
+        let value = self.value * QM31::from_u32_unchecked(0, 1, 0, 0);
+        let first = self.first.shift_by_i();
+        let second = self.second.shift_by_i();
+
+        Self {
+            value,
+            first,
+            second,
+        }
+    }
+
+    pub fn shift_by_j(&self) -> QM31Var {
+        let value = self.value * QM31::from_u32_unchecked(0, 0, 1, 0);
+        let second = self.first.clone();
+        let first = &(&self.second + &self.second) + &self.second.shift_by_i();
+
+        Self {
+            value,
+            first,
+            second,
+        }
+    }
+
+    pub fn shift_by_ij(&self) -> QM31Var {
+        let value = self.value * QM31::from_u32_unchecked(0, 0, 0, 1);
+        let second = self.first.shift_by_i();
+        let first = (&(&self.second + &self.second) + &self.second.shift_by_i()).shift_by_i();
+
+        Self {
+            value,
+            first,
+            second,
+        }
+    }
 }

@@ -21,10 +21,33 @@ impl DVar for M31Var {
 
 impl AllocVar for M31Var {
     fn new_variables(cs: &ConstraintSystemRef, value: &Self::Value, mode: AllocationMode) -> Self {
-        Self {
-            cs: cs.clone(),
-            value: *value,
-            variable: cs.new_variables(&[*value], mode),
+        if mode != AllocationMode::Constant {
+            Self {
+                cs: cs.clone(),
+                value: *value,
+                variable: cs.new_variables(&[*value], mode),
+            }
+        } else {
+            Self::new_constant(cs, value)
+        }
+    }
+
+    fn new_constant(cs: &ConstraintSystemRef, value: &Self::Value) -> Self {
+        let exist = cs.get_cache(format!("m31 {}", value.0));
+        if let Some(variable) = exist {
+            Self {
+                cs: cs.clone(),
+                value: *value,
+                variable,
+            }
+        } else {
+            let res = Self {
+                cs: cs.clone(),
+                value: *value,
+                variable: cs.new_variables(&[*value], AllocationMode::Constant),
+            };
+            cs.set_cache(format!("m31 {}", value.0), res.variable);
+            res
         }
     }
 }
