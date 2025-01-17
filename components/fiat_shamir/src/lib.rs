@@ -130,6 +130,10 @@ impl FiatShamirResults {
             ));
         }
 
+        // enforce the total sum
+        let one_sum = (&(&(&lookup_elements.alpha * &M31Var::one(&cs)) + &M31Var::one(&cs)) - &lookup_elements.z).inv();
+        (&(&one_sum + &proof.stmt1.poseidon_total_sum) + &proof.stmt1.plonk_total_sum).equalverify(&QM31Var::zero(&cs));
+
         // assumption: no duplicated queries in the first attempt
         let mut sorted_queries = vec![];
         for query in queries.iter() {
