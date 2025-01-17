@@ -9,9 +9,10 @@ use stwo_prover::core::fields::qm31::SecureField;
 use stwo_prover::core::fields::secure_column::SECURE_EXTENSION_DEGREE;
 use stwo_prover::core::fields::FieldExpOps;
 use stwo_prover::core::fri::{CirclePolyDegreeBound, FriVerifier};
-use stwo_prover::core::pcs::{CommitmentSchemeVerifier, PcsConfig, TreeSubspan};
+use stwo_prover::core::pcs::{CommitmentSchemeVerifier, PcsConfig, TreeSubspan, TreeVec};
 use stwo_prover::core::vcs::poseidon31_hash::Poseidon31Hash;
 use stwo_prover::core::vcs::poseidon31_merkle::{Poseidon31MerkleChannel, Poseidon31MerkleHasher};
+use stwo_prover::core::ColumnVec;
 use stwo_prover::examples::plonk_with_poseidon::air::{
     PlonkWithPoseidonComponents, PlonkWithPoseidonProof,
 };
@@ -40,6 +41,10 @@ pub struct FiatShamirHints {
 
     pub plonk_prepared_column_indices: Vec<usize>,
     pub poseidon_prepared_column_indices: Vec<usize>,
+
+    pub sample_points: TreeVec<ColumnVec<Vec<CirclePoint<SecureField>>>>,
+    pub mask_plonk: TreeVec<Vec<Vec<isize>>>,
+    pub mask_poseidon: TreeVec<Vec<Vec<isize>>>,
 }
 
 impl FiatShamirHints {
@@ -69,15 +74,25 @@ impl FiatShamirHints {
 
         let components =
             PlonkWithPoseidonComponents::new(&proof.stmt0, &lookup_elements, &proof.stmt1);
-        let one_sum: SecureField = lookup_elements.combine(&[M31::one(), M31::one()]);
+        let one_sum: SecureField = lookup_elements.combine(&[
+            M31::one(),
+            M31::one(),
+            M31::zero(),
+            M31::zero(),
+            M31::zero(),
+        ]);
 
         let plonk_tree_subspan = components.plonk.trace_locations().to_vec();
         let plonk_prepared_column_indices = components.plonk.preproccessed_column_indices();
         let poseidon_tree_subspan = components.poseidon.trace_locations().to_vec();
         let poseidon_prepared_column_indices = components.poseidon.preproccessed_column_indices();
 
+        // Get the mask relations
+        let mask_plonk = components.plonk.info.mask_offsets.clone();
+        let mask_poseidon = components.poseidon.info.mask_offsets.clone();
+
         let total_sum =
-            proof.stmt1.plonk_total_sum - one_sum.inverse() + proof.stmt1.poseidon_total_sum;
+            proof.stmt1.plonk_total_sum + one_sum.inverse() + proof.stmt1.poseidon_total_sum;
         assert_eq!(total_sum, SecureField::zero());
 
         let n_preprocessed_columns = commitment_scheme.trees[PREPROCESSED_TRACE_IDX]
@@ -99,15 +114,6 @@ impl FiatShamirHints {
 
         // Draw OODS point.
         let oods_point = CirclePoint::<SecureField>::get_random_point(channel);
-
-        println!(
-            "{:?}",
-            components.eval_composition_polynomial_at_point(
-                oods_point,
-                &proof.stark_proof.sampled_values,
-                random_coeff,
-            )
-        );
 
         // Get mask sample points relative to oods point.
         let mut sample_points = components.mask_points(oods_point);
@@ -191,6 +197,9 @@ impl FiatShamirHints {
             poseidon_tree_subspan,
             plonk_prepared_column_indices,
             poseidon_prepared_column_indices,
+            sample_points,
+            mask_plonk,
+            mask_poseidon,
         }
     }
 }

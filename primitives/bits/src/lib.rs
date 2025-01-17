@@ -2,7 +2,9 @@ use circle_plonk_dsl_constraint_system::dvar::{AllocVar, AllocationMode, DVar};
 use circle_plonk_dsl_constraint_system::ConstraintSystemRef;
 use circle_plonk_dsl_fields::M31Var;
 use num_traits::{One, Zero};
+use std::ops::Neg;
 use stwo_prover::core::fields::m31::M31;
+use stwo_prover::core::fields::qm31::QM31;
 
 #[derive(Clone)]
 pub struct BitsVar {
@@ -23,8 +25,15 @@ impl AllocVar for BitsVar {
     fn new_variables(cs: &ConstraintSystemRef, value: &Self::Value, mode: AllocationMode) -> Self {
         let mut variables = Vec::with_capacity(value.len());
         for &b in value.iter() {
-            let n = if b { M31::one() } else { M31::zero() };
-            variables.push(cs.new_variables(&[n], mode));
+            let n = if b { QM31::one() } else { QM31::zero() };
+            let bit = cs.new_qm31(n, mode);
+            variables.push(bit);
+
+            if mode == AllocationMode::Witness {
+                let minus_one = M31Var::new_constant(cs, &M31::one().neg());
+                let bit_minus_one = cs.add(bit, minus_one.variable);
+                cs.insert_gate(bit, bit_minus_one, 0, M31::zero());
+            }
         }
 
         Self {

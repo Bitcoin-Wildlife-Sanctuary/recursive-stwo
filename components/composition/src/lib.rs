@@ -46,8 +46,11 @@ impl CompositionCheck {
 
         // enforce that the columns are separate, which would be the case if the Poseidon circuit is
         // much smaller than the Plonk circuit (expected), so there is_first column does not overlap.
-        assert_eq!(*plonk_prepared_column_indices, vec![0, 1, 2, 3, 4, 5, 6]);
-        assert_eq!(*poseidon_prepared_column_indices, vec![7, 8, 9, 10, 11]);
+        assert_eq!(
+            *plonk_prepared_column_indices,
+            vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+        );
+        assert_eq!(*poseidon_prepared_column_indices, vec![10, 11, 12, 13, 14]);
 
         let mut evaluation_accumulator = PointEvaluationAccumulatorVar::new(random_coeff);
 
@@ -72,8 +75,6 @@ impl CompositionCheck {
             )
         };
         evaluate_plonk(lookup_elements, eval_row_plonk);
-
-        println!("Plonk completed");
 
         let eval_row_poseidon = {
             let preprocessed_mask: Vec<&Vec<QM31Var>> = poseidon_prepared_column_indices
@@ -118,11 +119,17 @@ mod test {
     };
     use circle_plonk_dsl_fields::QM31Var;
     use circle_plonk_dsl_hints::FiatShamirHints;
+    use num_traits::One;
+    use stwo_prover::core::fields::qm31::QM31;
     use stwo_prover::core::fields::FieldExpOps;
     use stwo_prover::core::fri::FriConfig;
     use stwo_prover::core::pcs::PcsConfig;
-    use stwo_prover::core::vcs::poseidon31_merkle::Poseidon31MerkleHasher;
-    use stwo_prover::examples::plonk_with_poseidon::air::PlonkWithPoseidonProof;
+    use stwo_prover::core::vcs::poseidon31_merkle::{
+        Poseidon31MerkleChannel, Poseidon31MerkleHasher,
+    };
+    use stwo_prover::examples::plonk_with_poseidon::air::{
+        prove_plonk_with_poseidon, verify_plonk_with_poseidon, PlonkWithPoseidonProof,
+    };
 
     #[test]
     fn test_composition() {
@@ -152,5 +159,29 @@ mod test {
             CirclePointQM31Var::new_constant(&cs, &fiat_shamir_hints.oods_point),
             &proof_var,
         );
+
+        cs.pad();
+        cs.check_arithmetics();
+        cs.populate_logup_arguments();
+        cs.check_poseidon_invocations();
+
+        let (plonk, mut poseidon) = cs.generate_circuit();
+        let proof = prove_plonk_with_poseidon::<Poseidon31MerkleChannel>(
+            plonk.mult_a.length.ilog2(),
+            poseidon.0.len().ilog2(),
+            config,
+            &plonk,
+            &mut poseidon,
+        );
+        verify_plonk_with_poseidon::<Poseidon31MerkleChannel>(
+            proof,
+            config,
+            &[
+                (1, QM31::one()),
+                (2, QM31::from_u32_unchecked(0, 1, 0, 0)),
+                (3, QM31::from_u32_unchecked(0, 0, 1, 0)),
+            ],
+        )
+        .unwrap();
     }
 }

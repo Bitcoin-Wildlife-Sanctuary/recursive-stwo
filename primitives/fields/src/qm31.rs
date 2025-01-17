@@ -10,27 +10,65 @@ use stwo_prover::core::fields::FieldExpOps;
 
 #[derive(Debug, Clone)]
 pub struct QM31Var {
+    pub cs: ConstraintSystemRef,
     pub value: QM31,
-    pub first: CM31Var,
-    pub second: CM31Var,
+    pub variable: usize,
 }
 
 impl DVar for QM31Var {
     type Value = QM31;
 
     fn cs(&self) -> ConstraintSystemRef {
-        self.first.cs().and(&self.second.cs())
+        self.cs.clone()
     }
 }
 
 impl AllocVar for QM31Var {
     fn new_variables(cs: &ConstraintSystemRef, value: &Self::Value, mode: AllocationMode) -> Self {
-        let first = CM31Var::new_variables(cs, &value.0, mode);
-        let second = CM31Var::new_variables(cs, &value.1, mode);
-        Self {
-            value: *value,
-            first,
-            second,
+        if mode != AllocationMode::Constant {
+            Self {
+                cs: cs.clone(),
+                value: *value,
+                variable: cs.new_qm31(*value, mode),
+            }
+        } else {
+            Self::new_constant(cs, value)
+        }
+    }
+
+    fn new_constant(cs: &ConstraintSystemRef, value: &Self::Value) -> Self {
+        if value.is_zero() {
+            return Self::zero(&cs);
+        }
+        if value.is_one() {
+            return Self::one(&cs);
+        }
+        if *value == QM31::from_u32_unchecked(0, 1, 0, 0) {
+            return Self::i(&cs);
+        }
+        if *value == QM31::from_u32_unchecked(0, 0, 1, 0) {
+            return Self::j(&cs);
+        }
+
+        let f = format!(
+            "qm31 {},{},{},{}",
+            value.0 .0 .0, value.0 .1 .0, value.1 .0 .0, value.1 .1 .0
+        );
+        let exist = cs.get_cache(f.clone());
+        if let Some(variable) = exist {
+            Self {
+                cs: cs.clone(),
+                value: *value,
+                variable,
+            }
+        } else {
+            let variable = cs.new_qm31(*value, AllocationMode::Constant);
+            cs.set_cache(f, variable);
+            Self {
+                cs: cs.clone(),
+                value: *value,
+                variable,
+            }
         }
     }
 }
@@ -39,9 +77,9 @@ impl From<&M31Var> for QM31Var {
     fn from(var: &M31Var) -> Self {
         let cs = var.cs();
         Self {
+            cs,
             value: QM31::from(var.value),
-            first: CM31Var::from(var),
-            second: CM31Var::zero(&cs),
+            variable: var.variable,
         }
     }
 }
@@ -50,10 +88,11 @@ impl Add<&M31Var> for &QM31Var {
     type Output = QM31Var;
 
     fn add(self, rhs: &M31Var) -> Self::Output {
+        let cs = self.cs();
         QM31Var {
+            cs: cs.clone(),
             value: self.value + rhs.value,
-            first: &self.first + rhs,
-            second: self.second.clone(),
+            variable: cs.add(self.variable, rhs.variable),
         }
     }
 }
@@ -70,10 +109,11 @@ impl Add<&CM31Var> for &QM31Var {
     type Output = QM31Var;
 
     fn add(self, rhs: &CM31Var) -> Self::Output {
+        let cs = self.cs();
         QM31Var {
+            cs: cs.clone(),
             value: self.value + QM31(rhs.value, CM31::zero()),
-            first: &self.first + rhs,
-            second: self.second.clone(),
+            variable: cs.add(self.variable, rhs.variable),
         }
     }
 }
@@ -90,10 +130,11 @@ impl Add<&QM31Var> for &QM31Var {
     type Output = QM31Var;
 
     fn add(self, rhs: &QM31Var) -> Self::Output {
+        let cs = self.cs();
         QM31Var {
+            cs: cs.clone(),
             value: self.value + rhs.value,
-            first: &self.first + &rhs.first,
-            second: &self.second + &rhs.second,
+            variable: cs.add(self.variable, rhs.variable),
         }
     }
 }
@@ -102,11 +143,7 @@ impl Sub<&M31Var> for &QM31Var {
     type Output = QM31Var;
 
     fn sub(self, rhs: &M31Var) -> Self::Output {
-        QM31Var {
-            value: self.value - rhs.value,
-            first: &self.first - rhs,
-            second: self.second.clone(),
-        }
+        self + &(-rhs)
     }
 }
 
@@ -114,11 +151,7 @@ impl Sub<&CM31Var> for &QM31Var {
     type Output = QM31Var;
 
     fn sub(self, rhs: &CM31Var) -> Self::Output {
-        QM31Var {
-            value: self.value - QM31(rhs.value, CM31::zero()),
-            first: &self.first - rhs,
-            second: self.second.clone(),
-        }
+        self + &(-rhs)
     }
 }
 
@@ -126,11 +159,7 @@ impl Sub<&QM31Var> for &QM31Var {
     type Output = QM31Var;
 
     fn sub(self, rhs: &QM31Var) -> Self::Output {
-        QM31Var {
-            value: self.value - rhs.value,
-            first: &self.first - &rhs.first,
-            second: &self.second - &rhs.second,
-        }
+        self + &(-rhs)
     }
 }
 
@@ -154,10 +183,11 @@ impl Mul<&M31Var> for &QM31Var {
     type Output = QM31Var;
 
     fn mul(self, rhs: &M31Var) -> Self::Output {
+        let cs = self.cs();
         QM31Var {
+            cs: cs.clone(),
             value: self.value * rhs.value,
-            first: &self.first * rhs,
-            second: &self.second * rhs,
+            variable: cs.mul(self.variable, rhs.variable),
         }
     }
 }
@@ -174,10 +204,11 @@ impl Mul<&CM31Var> for &QM31Var {
     type Output = QM31Var;
 
     fn mul(self, rhs: &CM31Var) -> Self::Output {
+        let cs = self.cs();
         QM31Var {
+            cs: cs.clone(),
             value: self.value * QM31(rhs.value, CM31::zero()),
-            first: &self.first * rhs,
-            second: &self.second * rhs,
+            variable: cs.mul(self.variable, rhs.variable),
         }
     }
 }
@@ -194,26 +225,11 @@ impl Mul<&QM31Var> for &QM31Var {
     type Output = QM31Var;
 
     fn mul(self, rhs: &QM31Var) -> Self::Output {
-        let a0b0 = &self.first * &rhs.first;
-        let a1b1 = &self.second * &rhs.second;
-
-        let sum_a = &self.first + &self.second;
-        let sum_b = &rhs.first + &rhs.second;
-
-        let asbs = &sum_a * &sum_b;
-        let a1b1_shifted = a1b1.shift_by_i();
-
-        let mut first = &a0b0 + &a1b1;
-        first = &first + &a1b1;
-        first = &first + &a1b1_shifted;
-
-        let mut second = &asbs - &a0b0;
-        second = &second - &a1b1;
-
+        let cs = self.cs();
         QM31Var {
+            cs: cs.clone(),
             value: self.value * rhs.value,
-            first,
-            second,
+            variable: cs.mul(self.variable, rhs.variable),
         }
     }
 }
@@ -222,144 +238,157 @@ impl Neg for &QM31Var {
     type Output = QM31Var;
 
     fn neg(self) -> Self::Output {
+        let value = -self.value;
+        let variable = self.cs.mul_constant(self.variable, M31::one().neg());
+
         QM31Var {
-            value: -self.value,
-            first: -&self.first,
-            second: -&self.second,
+            cs: self.cs.clone(),
+            value,
+            variable,
         }
     }
 }
 
 impl QM31Var {
     pub fn from_m31(a0: &M31Var, a1: &M31Var, a2: &M31Var, a3: &M31Var) -> Self {
+        let cs = a0.cs().and(&a1.cs()).and(&a2.cs()).and(&a3.cs());
+
         Self {
+            cs: cs.clone(),
             value: QM31(CM31(a0.value, a1.value), CM31(a2.value, a3.value)),
-            first: CM31Var::from_m31(a0, a1),
-            second: CM31Var::from_m31(a2, a3),
+            variable: cs.add(
+                cs.add(a0.variable, cs.mul(a1.variable, 2)),
+                cs.mul(cs.add(a2.variable, cs.mul(a3.variable, 2)), 3),
+            ),
         }
     }
 
+    pub fn decompose(&self) -> [M31Var; 4] {
+        let cs = self.cs();
+
+        let a0 = M31Var::new_witness(&cs, &self.value.0 .0);
+        let a1 = M31Var::new_witness(&cs, &self.value.0 .1);
+        let a2 = M31Var::new_witness(&cs, &self.value.1 .0);
+        let a3 = M31Var::new_witness(&cs, &self.value.1 .1);
+
+        let l = cs.add(a0.variable, cs.mul(a1.variable, 2));
+        let r = cs.mul(cs.add(a2.variable, cs.mul(a3.variable, 2)), 3);
+
+        cs.insert_gate(l, r, self.variable, M31::one());
+
+        [a0, a1, a2, a3]
+    }
+
     pub fn from_cm31(a0: &CM31Var, a1: &CM31Var) -> Self {
+        let cs = a0.cs().and(&a1.cs());
+
         Self {
+            cs: cs.clone(),
             value: QM31(a0.value, a1.value),
-            first: a0.clone(),
-            second: a1.clone(),
+            variable: cs.add(a0.variable, cs.mul(a1.variable, 3)),
         }
     }
 
     pub fn zero(cs: &ConstraintSystemRef) -> QM31Var {
         QM31Var {
+            cs: cs.clone(),
             value: QM31::zero(),
-            first: CM31Var::zero(cs),
-            second: CM31Var::zero(cs),
+            variable: 0,
         }
     }
 
     pub fn one(cs: &ConstraintSystemRef) -> QM31Var {
         QM31Var {
+            cs: cs.clone(),
             value: QM31::one(),
-            first: CM31Var::one(cs),
-            second: CM31Var::zero(cs),
+            variable: 1,
+        }
+    }
+
+    pub fn i(cs: &ConstraintSystemRef) -> QM31Var {
+        QM31Var {
+            cs: cs.clone(),
+            value: QM31(CM31::from_u32_unchecked(0, 1), CM31::zero()),
+            variable: 2,
+        }
+    }
+
+    pub fn j(cs: &ConstraintSystemRef) -> QM31Var {
+        QM31Var {
+            cs: cs.clone(),
+            value: QM31(CM31::zero(), CM31::one()),
+            variable: 3,
         }
     }
 
     pub fn equalverify(&self, rhs: &QM31Var) {
         assert_eq!(self.value, rhs.value);
-        self.first.equalverify(&rhs.first);
-        self.second.equalverify(&rhs.second);
+        let cs = self.cs.and(&rhs.cs);
+        cs.insert_gate(self.variable, 0, rhs.variable, M31::one());
     }
 
     pub fn inv(&self) -> QM31Var {
         let cs = self.cs();
         let value = self.value.inverse();
         let res = QM31Var::new_witness(&cs, &value);
-
-        let expected_one = &res * self;
-        expected_one.first.real.equalverify(&M31Var::one(&cs));
-        cs.enforce_zero(expected_one.first.imag.variable);
-        cs.enforce_zero(expected_one.second.real.variable);
-        cs.enforce_zero(expected_one.second.imag.variable);
-
+        cs.insert_gate(self.variable, res.variable, 1, M31::zero());
         res
     }
 
     pub fn mul_constant_m31(&self, constant: M31) -> QM31Var {
         let value = self.value * constant;
-
         QM31Var {
+            cs: self.cs.clone(),
             value,
-            first: self.first.mul_constant_m31(constant),
-            second: self.second.mul_constant_m31(constant),
+            variable: self.cs.mul_constant(self.variable, constant),
         }
     }
 
     pub fn mul_constant_cm31(&self, constant: CM31) -> QM31Var {
-        let value = self.value * QM31(constant, CM31::zero());
+        let cs = self.cs();
+
+        let a = self.mul_constant_m31(constant.0);
+        let b = self.mul_constant_m31(constant.1);
+
+        let variable = cs.add(a.variable, cs.mul(b.variable, 2));
 
         QM31Var {
-            value,
-            first: self.first.mul_constant_cm31(constant),
-            second: self.second.mul_constant_cm31(constant),
+            cs,
+            value: self.value * QM31(constant, CM31::zero()),
+            variable,
         }
     }
 
     pub fn mul_constant_qm31(&self, constant: QM31) -> QM31Var {
-        let a0b0 = self.first.mul_constant_cm31(constant.0);
-        let a1b1 = self.second.mul_constant_cm31(constant.1);
-
-        let sum_a = &self.first + &self.second;
-        let sum_b = constant.0 + constant.1;
-
-        let asbs = sum_a.mul_constant_cm31(sum_b);
-        let a1b1_shifted = a1b1.shift_by_i();
-
-        let mut first = &a0b0 + &a1b1;
-        first = &first + &a1b1;
-        first = &first + &a1b1_shifted;
-
-        let mut second = &asbs - &a0b0;
-        second = &second - &a1b1;
+        let cs = self.cs();
+        let constant_var = cs.new_qm31(constant, AllocationMode::Constant);
 
         QM31Var {
+            cs: cs.clone(),
             value: self.value * constant,
-            first,
-            second,
+            variable: cs.mul(self.variable, constant_var),
         }
     }
 
     pub fn shift_by_i(&self) -> QM31Var {
-        let value = self.value * QM31::from_u32_unchecked(0, 1, 0, 0);
-        let first = self.first.shift_by_i();
-        let second = self.second.shift_by_i();
-
-        Self {
-            value,
-            first,
-            second,
+        let cs = self.cs();
+        QM31Var {
+            cs: cs.clone(),
+            value: self.value * QM31::from_u32_unchecked(0, 1, 0, 0),
+            variable: cs.mul(self.variable, 2),
         }
     }
 
     pub fn shift_by_j(&self) -> QM31Var {
-        let value = self.value * QM31::from_u32_unchecked(0, 0, 1, 0);
-        let second = self.first.clone();
-        let first = &(&self.second + &self.second) + &self.second.shift_by_i();
-
-        Self {
-            value,
-            first,
-            second,
+        let cs = self.cs();
+        QM31Var {
+            cs: cs.clone(),
+            value: self.value * QM31::from_u32_unchecked(0, 0, 1, 0),
+            variable: cs.mul(self.variable, 3),
         }
     }
 
     pub fn shift_by_ij(&self) -> QM31Var {
-        let value = self.value * QM31::from_u32_unchecked(0, 0, 0, 1);
-        let second = self.first.shift_by_i();
-        let first = (&(&self.second + &self.second) + &self.second.shift_by_i()).shift_by_i();
-
-        Self {
-            value,
-            first,
-            second,
-        }
+        self.shift_by_i().shift_by_j()
     }
 }

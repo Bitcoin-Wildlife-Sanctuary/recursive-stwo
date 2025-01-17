@@ -25,7 +25,7 @@ impl AllocVar for M31Var {
             Self {
                 cs: cs.clone(),
                 value: *value,
-                variable: cs.new_variables(&[*value], mode),
+                variable: cs.new_m31(*value, mode),
             }
         } else {
             Self::new_constant(cs, value)
@@ -33,6 +33,13 @@ impl AllocVar for M31Var {
     }
 
     fn new_constant(cs: &ConstraintSystemRef, value: &Self::Value) -> Self {
+        if value.is_zero() {
+            return Self::zero(&cs);
+        }
+        if value.is_one() {
+            return Self::one(&cs);
+        }
+
         let exist = cs.get_cache(format!("m31 {}", value.0));
         if let Some(variable) = exist {
             Self {
@@ -44,7 +51,7 @@ impl AllocVar for M31Var {
             let res = Self {
                 cs: cs.clone(),
                 value: *value,
-                variable: cs.new_variables(&[*value], AllocationMode::Constant),
+                variable: cs.new_m31(*value, AllocationMode::Constant),
             };
             cs.set_cache(format!("m31 {}", value.0), res.variable);
             res
@@ -127,17 +134,15 @@ impl M31Var {
     pub fn equalverify(&self, rhs: &M31Var) {
         assert_eq!(self.value, rhs.value);
         let cs = self.cs.and(&rhs.cs);
-        let expected_zero = self - rhs;
-        cs.enforce_zero(expected_zero.variable);
+        cs.insert_gate(self.variable, 0, rhs.variable, M31::one());
     }
 
     pub fn inv(&self) -> M31Var {
         let cs = self.cs.clone();
+
         let value = self.value.inverse();
         let res = M31Var::new_witness(&cs, &value);
-
-        let expected_one = &res * self;
-        expected_one.equalverify(&Self::one(&res.cs));
+        cs.insert_gate(self.variable, res.variable, 1, M31::zero());
 
         res
     }
@@ -168,8 +173,7 @@ impl M31Var {
             }
         });
         let out = &(self * &inv).neg() + &M31Var::one(&cs);
-        let expected_zero = self * &out;
-        expected_zero.equalverify(&M31Var::zero(&cs));
+        cs.insert_gate(self.variable, out.variable, 0, M31::zero());
 
         out
     }

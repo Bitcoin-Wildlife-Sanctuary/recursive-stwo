@@ -5,13 +5,9 @@ use circle_plonk_dsl_constraint_system::dvar::DVar;
 use circle_plonk_dsl_data_structures::{
     PlonkWithAcceleratorLookupElementsVar, PlonkWithPoseidonProofVar,
 };
-use circle_plonk_dsl_fields::{CM31Var, M31Var, QM31Var};
+use circle_plonk_dsl_fields::{M31Var, QM31Var};
 use circle_plonk_dsl_hints::FiatShamirHints;
-use num_traits::Zero;
 use std::cmp::max;
-use stwo_prover::core::fields::cm31::CM31;
-use stwo_prover::core::fields::m31::M31;
-use stwo_prover::core::fields::qm31::QM31;
 use stwo_prover::core::fields::FieldExpOps;
 
 pub struct FiatShamirResults {
@@ -30,34 +26,37 @@ pub struct FiatShamirResults {
 }
 
 impl FiatShamirResults {
-    pub fn compute(fiat_shamir_hints: &FiatShamirHints, proof: &PlonkWithPoseidonProofVar) -> Self {
+    pub fn compute(
+        fiat_shamir_hints: &FiatShamirHints,
+        proof: &mut PlonkWithPoseidonProofVar,
+    ) -> Self {
         let cs = proof.cs();
 
-        let preprocessed_commitment = proof.stark_proof.commitments[0].clone();
-        let trace_commitment = proof.stark_proof.commitments[1].clone();
-        let interaction_trace_commitment = proof.stark_proof.commitments[2].clone();
-        let composition_commitment = proof.stark_proof.commitments[3].clone();
+        let mut preprocessed_commitment = proof.stark_proof.commitments[0].clone();
+        let mut trace_commitment = proof.stark_proof.commitments[1].clone();
+        let mut interaction_trace_commitment = proof.stark_proof.commitments[2].clone();
+        let mut composition_commitment = proof.stark_proof.commitments[3].clone();
 
         let mut channel = ChannelVar::default(&cs);
 
         // Preprocessed trace.
-        channel.mix_root(&preprocessed_commitment);
+        channel.mix_root(&mut preprocessed_commitment);
 
         // Trace.
         proof.stmt0.mix_into(&mut channel);
-        channel.mix_root(&trace_commitment);
+        channel.mix_root(&mut trace_commitment);
 
         // Draw interaction elements.
         let lookup_elements = PlonkWithAcceleratorLookupElementsVar::draw(&mut channel);
 
         // Interaction trace.
         proof.stmt1.mix_into(&mut channel);
-        channel.mix_root(&interaction_trace_commitment);
+        channel.mix_root(&mut interaction_trace_commitment);
 
         let random_coeff = channel.get_felts()[0].clone();
 
         // Read composition polynomial commitment.
-        channel.mix_root(&composition_commitment);
+        channel.mix_root(&mut composition_commitment);
 
         // Draw OODS point.
         let oods_point = CirclePointQM31Var::from_channel(&mut channel);
@@ -75,34 +74,26 @@ impl FiatShamirResults {
 
         // FRI layers commitments and alphas
         let mut fri_alphas = vec![];
-        channel.mix_root(&proof.stark_proof.fri_proof.first_layer_commitment);
+        channel.mix_root(&mut proof.stark_proof.fri_proof.first_layer_commitment);
         fri_alphas.push(channel.get_felts()[0].clone());
 
-        for l in proof.stark_proof.fri_proof.inner_layer_commitments.iter() {
-            channel.mix_root(&l);
+        for l in proof
+            .stark_proof
+            .fri_proof
+            .inner_layer_commitments
+            .iter_mut()
+        {
+            channel.mix_root(l);
             fri_alphas.push(channel.get_felts()[0].clone());
         }
         channel.absorb_one_felt_and_permute(&proof.stark_proof.fri_proof.last_poly);
 
-        let nonce_felt = {
-            QM31Var {
-                value: QM31::from_m31(
-                    proof.stark_proof.proof_of_work[0].value,
-                    proof.stark_proof.proof_of_work[1].value,
-                    proof.stark_proof.proof_of_work[2].value,
-                    M31::zero(),
-                ),
-                first: CM31Var {
-                    value: CM31(
-                        proof.stark_proof.proof_of_work[0].value,
-                        proof.stark_proof.proof_of_work[1].value,
-                    ),
-                    real: proof.stark_proof.proof_of_work[0].clone(),
-                    imag: proof.stark_proof.proof_of_work[1].clone(),
-                },
-                second: CM31Var::from(&proof.stark_proof.proof_of_work[2]),
-            }
-        };
+        let nonce_felt = QM31Var::from_m31(
+            &proof.stark_proof.proof_of_work[0],
+            &proof.stark_proof.proof_of_work[1],
+            &proof.stark_proof.proof_of_work[2],
+            &M31Var::zero(&cs),
+        );
 
         let _ = BitsVar::from_m31(&proof.stark_proof.proof_of_work[0], 22);
         let _ = BitsVar::from_m31(&proof.stark_proof.proof_of_work[1], 21);
@@ -110,7 +101,7 @@ impl FiatShamirResults {
 
         channel.absorb_one_felt_and_permute(&nonce_felt);
 
-        let lower_bits = get_lower_bits_checked(&channel.digest.to_m31()[0], 20);
+        let lower_bits = get_lower_bits_checked(&channel.digest.to_qm31()[0].decompose()[0], 20);
         lower_bits.equalverify(&M31Var::zero(&cs));
 
         let mut raw_queries = Vec::with_capacity(16);
@@ -124,10 +115,7 @@ impl FiatShamirResults {
             draw_queries_felts.push(b);
         }
         for felt in draw_queries_felts.iter() {
-            raw_queries.push(felt.first.real.clone());
-            raw_queries.push(felt.first.imag.clone());
-            raw_queries.push(felt.second.real.clone());
-            raw_queries.push(felt.second.imag.clone());
+            raw_queries.extend_from_slice(&felt.decompose());
         }
 
         let mut queries = Vec::with_capacity(16);
@@ -157,7 +145,7 @@ impl FiatShamirResults {
         for i in 0..9 {
             assert_eq!(
                 lookup_elements.alpha_powers[i].value,
-                fiat_shamir_hints.alpha.pow((i + 1) as u128)
+                fiat_shamir_hints.alpha.pow(i as u128)
             );
         }
         assert_eq!(random_coeff.value, fiat_shamir_hints.random_coeff);
@@ -194,6 +182,8 @@ mod test {
     use circle_plonk_dsl_constraint_system::ConstraintSystemRef;
     use circle_plonk_dsl_data_structures::PlonkWithPoseidonProofVar;
     use circle_plonk_dsl_hints::FiatShamirHints;
+    use num_traits::One;
+    use stwo_prover::core::fields::qm31::QM31;
     use stwo_prover::core::fri::FriConfig;
     use stwo_prover::core::pcs::PcsConfig;
     use stwo_prover::core::vcs::poseidon31_merkle::{
@@ -215,23 +205,32 @@ mod test {
         let fiat_shamir_hints = FiatShamirHints::new(&proof, config);
 
         let cs = ConstraintSystemRef::new_ref();
-        let proof_var = PlonkWithPoseidonProofVar::new_constant(&cs, &proof);
+        let mut proof_var = PlonkWithPoseidonProofVar::new_constant(&cs, &proof);
 
-        let _results = FiatShamirResults::compute(&fiat_shamir_hints, &proof_var);
+        let _results = FiatShamirResults::compute(&fiat_shamir_hints, &mut proof_var);
 
         cs.pad();
         cs.check_arithmetics();
-        cs.check_logup_arguments();
+        cs.populate_logup_arguments();
         cs.check_poseidon_invocations();
 
         let (plonk, mut poseidon) = cs.generate_circuit();
         let proof = prove_plonk_with_poseidon::<Poseidon31MerkleChannel>(
-            plonk.mult.length.ilog2(),
-            poseidon.control_flow.sel_1.len().ilog2(),
+            plonk.mult_a.length.ilog2(),
+            poseidon.0.len().ilog2(),
             config,
             &plonk,
             &mut poseidon,
         );
-        verify_plonk_with_poseidon::<Poseidon31MerkleChannel>(proof, config).unwrap();
+        verify_plonk_with_poseidon::<Poseidon31MerkleChannel>(
+            proof,
+            config,
+            &[
+                (1, QM31::one()),
+                (2, QM31::from_u32_unchecked(0, 1, 0, 0)),
+                (3, QM31::from_u32_unchecked(0, 0, 1, 0)),
+            ],
+        )
+        .unwrap();
     }
 }

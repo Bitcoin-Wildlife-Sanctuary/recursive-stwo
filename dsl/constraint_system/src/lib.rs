@@ -3,15 +3,16 @@ use num_traits::{One, Zero};
 use std::cell::RefCell;
 use std::cmp::max;
 use std::collections::HashMap;
+use std::ops::Neg;
 use std::rc::Rc;
 use stwo_prover::core::backend::simd::m31::N_LANES;
 use stwo_prover::core::backend::Column;
 use stwo_prover::core::fields::m31::M31;
+use stwo_prover::core::fields::qm31::QM31;
 use stwo_prover::core::vcs::poseidon31_ref::poseidon2_permute;
 use stwo_prover::examples::plonk_with_poseidon::plonk::PlonkWithAcceleratorCircuitTrace;
 use stwo_prover::examples::plonk_with_poseidon::poseidon::{
-    PoseidonControlFlow, PoseidonDataFlow, PoseidonMetadata, PoseidonPrescribedFlow, CONSTANT_1,
-    CONSTANT_2, CONSTANT_3,
+    PoseidonEntry, PoseidonFlow, CONSTANT_1, CONSTANT_2, CONSTANT_3,
 };
 
 pub mod dvar;
@@ -34,8 +35,12 @@ impl ConstraintSystemRef {
         self.0.borrow_mut().cache.insert(str.to_string(), range);
     }
 
-    pub fn new_variables(&self, variables: &[M31], mode: AllocationMode) -> usize {
-        self.0.borrow_mut().new_variables(variables, mode)
+    pub fn new_m31(&self, variables: M31, mode: AllocationMode) -> usize {
+        self.0.borrow_mut().new_m31(variables, mode)
+    }
+
+    pub fn new_qm31(&self, variable: QM31, mode: AllocationMode) -> usize {
+        self.0.borrow_mut().new_qm31(variable, mode)
     }
 
     pub fn and(&self, other: &Self) -> Self {
@@ -43,8 +48,8 @@ impl ConstraintSystemRef {
         self.clone()
     }
 
-    pub fn insert_gate(&self, a_wire: usize, b_wire: usize, op: M31) -> usize {
-        self.0.borrow_mut().insert_gate(a_wire, b_wire, op)
+    pub fn insert_gate(&self, a_wire: usize, b_wire: usize, c_wire: usize, op: M31) {
+        self.0.borrow_mut().insert_gate(a_wire, b_wire, c_wire, op)
     }
 
     pub fn add(&self, a_wire: usize, b_wire: usize) -> usize {
@@ -67,56 +72,54 @@ impl ConstraintSystemRef {
         self.0.borrow().check_arithmetics();
     }
 
-    pub fn check_logup_arguments(&self) {
-        self.0.borrow().check_logup_argument();
+    pub fn populate_logup_arguments(&self) {
+        self.0.borrow_mut().populate_logup_arguments();
     }
 
     pub fn check_poseidon_invocations(&self) {
         self.0.borrow().check_poseidon_invocations();
     }
 
-    pub fn copy(&self, a_wire: usize) -> usize {
-        self.0.borrow_mut().copy(a_wire)
-    }
-
     pub fn invoke_poseidon_accelerator(
         &self,
-        addr_1: usize,
-        addr_2: usize,
-        addr_3: usize,
-        addr_4: usize,
+        entry_1: PoseidonEntry,
+        entry_2: PoseidonEntry,
+        entry_3: PoseidonEntry,
+        entry_4: PoseidonEntry,
     ) {
         self.0
             .borrow_mut()
-            .invoke_poseidon_accelerator(addr_1, addr_2, addr_3, addr_4);
+            .invoke_poseidon_accelerator(entry_1, entry_2, entry_3, entry_4);
     }
 
     pub fn pad(&self) {
         self.0.borrow_mut().pad();
     }
 
-    pub fn generate_circuit(&self) -> (PlonkWithAcceleratorCircuitTrace, PoseidonMetadata) {
+    pub fn generate_circuit(&self) -> (PlonkWithAcceleratorCircuitTrace, PoseidonFlow) {
         self.0.borrow().generate_circuit()
     }
 }
 
 #[derive(Debug)]
 pub struct ConstraintSystem {
-    pub variables: Vec<M31>,
+    pub variables: Vec<QM31>,
 
     pub cache: HashMap<String, usize>,
 
     pub a_wire: Vec<usize>,
     pub b_wire: Vec<usize>,
+    pub c_wire: Vec<usize>,
 
-    pub mult: Vec<usize>,
+    pub mult_a: Vec<isize>,
+    pub mult_b: Vec<isize>,
+    pub mult_c: Vec<isize>,
     pub mult_poseidon: Vec<usize>,
+
+    pub enforce_c_m31: Vec<usize>,
     pub op: Vec<M31>,
 
-    pub addr_1: Vec<usize>,
-    pub addr_2: Vec<usize>,
-    pub addr_3: Vec<usize>,
-    pub addr_4: Vec<usize>,
+    pub flow: PoseidonFlow,
 
     pub num_input: usize,
     pub is_program_started: bool,
@@ -137,328 +140,459 @@ impl ConstraintSystem {
             cache: HashMap::new(),
             a_wire: Vec::with_capacity(1 << LOG_CONSTRAINT_SYSTEM_RESERVED_SIZE),
             b_wire: Vec::with_capacity(1 << LOG_CONSTRAINT_SYSTEM_RESERVED_SIZE),
-            mult: Vec::with_capacity(1 << LOG_CONSTRAINT_SYSTEM_RESERVED_SIZE),
-            mult_poseidon: Vec::with_capacity(1 << LOG_CONSTRAINT_SYSTEM_RESERVED_SIZE),
+            c_wire: Vec::with_capacity(1 << LOG_CONSTRAINT_SYSTEM_RESERVED_SIZE),
+            mult_a: vec![],
+            mult_b: vec![],
+            mult_c: vec![],
+            mult_poseidon: vec![],
+            enforce_c_m31: Vec::with_capacity(1 << LOG_CONSTRAINT_SYSTEM_RESERVED_SIZE),
             op: Vec::with_capacity(1 << LOG_CONSTRAINT_SYSTEM_RESERVED_SIZE),
-            addr_1: vec![],
-            addr_2: vec![],
-            addr_3: vec![],
-            addr_4: vec![],
             num_input: 0,
             is_program_started: false,
+            flow: PoseidonFlow::default(),
         };
 
-        cs.variables.push(M31::zero());
+        cs.variables.push(QM31::zero());
+        cs.variables.push(QM31::one());
+        cs.variables.push(QM31::from_u32_unchecked(0, 1, 0, 0));
+        cs.variables.push(QM31::from_u32_unchecked(0, 0, 1, 0));
+
         cs.a_wire.push(0);
         cs.b_wire.push(0);
-        cs.mult.push(3);
-        cs.mult_poseidon.push(0);
+        cs.c_wire.push(0);
+        cs.enforce_c_m31.push(0);
         cs.op.push(M31::one());
 
-        cs.variables.push(M31::one());
         cs.a_wire.push(1);
         cs.b_wire.push(0);
-        cs.mult.push(0);
-        cs.mult_poseidon.push(0);
+        cs.c_wire.push(1);
+        cs.enforce_c_m31.push(0);
         cs.op.push(M31::one());
 
-        cs.num_input = 1;
+        cs.a_wire.push(2);
+        cs.b_wire.push(0);
+        cs.c_wire.push(2);
+        cs.enforce_c_m31.push(0);
+        cs.op.push(M31::one());
+
+        cs.a_wire.push(3);
+        cs.b_wire.push(0);
+        cs.c_wire.push(3);
+        cs.enforce_c_m31.push(0);
+        cs.op.push(M31::one());
+
+        cs.num_input = 3;
 
         cs
     }
 
-    pub fn insert_gate(&mut self, a_wire: usize, b_wire: usize, op: M31) -> usize {
+    pub fn insert_gate(&mut self, a_wire: usize, b_wire: usize, c_wire: usize, op: M31) {
         self.is_program_started = true;
         let id = self.variables.len();
 
         self.a_wire.push(a_wire);
         self.b_wire.push(b_wire);
-        self.mult.push(0);
-        self.mult_poseidon.push(0);
+        self.c_wire.push(c_wire);
+        self.enforce_c_m31.push(0);
         self.op.push(op);
 
         assert!(a_wire < id);
         assert!(b_wire < id);
+        assert!(c_wire < id);
 
         self.variables.push(
-            op * (self.variables[a_wire] + self.variables[b_wire])
-                + (M31::one() - op) * self.variables[a_wire] * self.variables[b_wire],
+            (self.variables[a_wire] + self.variables[b_wire]) * op
+                + self.variables[a_wire] * self.variables[b_wire] * (M31::one() - op),
         );
-
-        self.mult[a_wire] += 1;
-        self.mult[b_wire] += 1;
-
-        id
     }
 
     pub fn invoke_poseidon_accelerator(
         &mut self,
-        addr_1: usize,
-        addr_2: usize,
-        addr_3: usize,
-        addr_4: usize,
+        entry_1: PoseidonEntry,
+        entry_2: PoseidonEntry,
+        entry_3: PoseidonEntry,
+        entry_4: PoseidonEntry,
     ) {
-        self.addr_1.push(addr_1);
-        self.addr_2.push(addr_2);
-        self.addr_3.push(addr_3);
-        self.addr_4.push(addr_4);
-
-        self.mult[addr_1] += 1;
-        self.mult[addr_2] += 1;
-        self.mult[addr_3] += 1;
-        self.mult[addr_4] += 1;
-
-        let sel_1 = self.variables[addr_1].0 as usize;
-        let sel_2 = self.variables[addr_2].0 as usize;
-        let sel_3 = self.variables[addr_3].0 as usize;
-        let sel_4 = self.variables[addr_4].0 as usize;
-
-        self.mult_poseidon[sel_1] += 1;
-        self.mult_poseidon[sel_2] += 1;
-        self.mult_poseidon[sel_3] += 1;
-        self.mult_poseidon[sel_4] += 1;
+        self.flow.0.push((entry_1, entry_2, entry_3, entry_4));
     }
 
     pub fn enforce_zero(&mut self, var: usize) {
         self.is_program_started = true;
-        // a + b = a => b = 0
-        let id = self.variables.len();
 
-        self.a_wire.push(id);
-        self.b_wire.push(var);
-        self.mult.push(1);
-        self.mult_poseidon.push(0);
+        self.a_wire.push(var);
+        self.b_wire.push(0);
+        self.c_wire.push(0);
+        self.enforce_c_m31.push(0);
         self.op.push(M31::one());
-        self.variables.push(M31::zero()); // can be any value
-
-        self.mult[var] += 1;
     }
 
     pub fn add(&mut self, a_wire: usize, b_wire: usize) -> usize {
-        self.insert_gate(a_wire, b_wire, M31::one())
+        let a_val = self.variables[a_wire];
+        let b_val = self.variables[b_wire];
+
+        let c_wire = self.variables.len();
+        self.variables.push(a_val + b_val);
+
+        self.insert_gate(a_wire, b_wire, c_wire, M31::one());
+        c_wire
     }
 
     pub fn mul(&mut self, a_wire: usize, b_wire: usize) -> usize {
-        self.insert_gate(a_wire, b_wire, M31::zero())
+        let a_val = self.variables[a_wire];
+        let b_val = self.variables[b_wire];
+
+        let c_wire = self.variables.len();
+        self.variables.push(a_val * b_val);
+
+        self.insert_gate(a_wire, b_wire, c_wire, M31::zero());
+        c_wire
     }
 
     pub fn mul_constant(&mut self, a_wire: usize, constant: M31) -> usize {
-        self.insert_gate(a_wire, 0, constant)
+        let a_val = self.variables[a_wire];
+
+        let c_wire = self.variables.len();
+        self.variables.push(a_val * constant);
+
+        self.insert_gate(a_wire, 0, c_wire, constant);
+        c_wire
     }
 
-    pub fn copy(&mut self, a_wire: usize) -> usize {
-        self.insert_gate(a_wire, 0, M31::one())
-    }
+    pub fn new_m31(&mut self, variable: M31, mode: AllocationMode) -> usize {
+        let c_wire = self.variables.len();
+        self.variables.push(QM31::from(variable));
 
-    pub fn new_variables(&mut self, variables: &[M31], mode: AllocationMode) -> usize {
         match mode {
             AllocationMode::PublicInput => {
                 assert!(!self.is_program_started);
 
-                let mut id = self.variables.len();
-                let start = id;
-                for &variable in variables.iter() {
-                    self.variables.push(variable);
-                    self.a_wire.push(id);
-                    self.b_wire.push(1);
-                    self.mult.push(0); // intentionally reduces the count by 1
-                    self.mult_poseidon.push(0);
-                    self.op.push(M31::zero());
+                self.a_wire.push(c_wire);
+                self.b_wire.push(0);
+                self.c_wire.push(c_wire);
+                self.enforce_c_m31.push(1);
+                self.op.push(M31::one());
 
-                    self.mult[1] += 1;
-                    self.num_input += 1;
-                    id += 1;
-                }
-                start
+                self.num_input += 1;
             }
             AllocationMode::Witness => {
                 self.is_program_started = true;
 
-                let mut id = self.variables.len();
-                let start = id;
-                for &variable in variables.iter() {
-                    self.variables.push(variable);
-                    self.a_wire.push(id);
-                    self.b_wire.push(1);
-                    self.mult.push(1);
-                    self.mult_poseidon.push(0);
-                    self.op.push(M31::zero());
-
-                    self.mult[1] += 1;
-                    id += 1;
-                }
-                start
+                self.a_wire.push(c_wire);
+                self.b_wire.push(0);
+                self.c_wire.push(c_wire);
+                self.enforce_c_m31.push(1);
+                self.op.push(M31::one());
             }
             AllocationMode::Constant => {
                 self.is_program_started = true;
 
-                let mut id = self.variables.len();
-                let start = id;
-                for &variable in variables.iter() {
-                    self.variables.push(variable);
-                    self.a_wire.push(1);
-                    self.b_wire.push(0);
-                    self.mult.push(0);
-                    self.mult_poseidon.push(0);
-                    self.op.push(variable);
-
-                    self.mult[0] += 1;
-                    self.mult[1] += 1;
-                    id += 1;
-                }
-                start
+                self.a_wire.push(1);
+                self.b_wire.push(0);
+                self.c_wire.push(c_wire);
+                self.enforce_c_m31.push(0);
+                self.op.push(variable);
             }
         }
+
+        c_wire
+    }
+
+    pub fn new_qm31(&mut self, variable: QM31, mode: AllocationMode) -> usize {
+        let c_wire = self.variables.len();
+        self.variables.push(variable);
+
+        match mode {
+            AllocationMode::PublicInput => {
+                assert!(!self.is_program_started);
+
+                self.a_wire.push(c_wire);
+                self.b_wire.push(0);
+                self.c_wire.push(c_wire);
+                self.enforce_c_m31.push(1);
+                self.op.push(M31::one());
+
+                self.num_input += 1;
+            }
+            AllocationMode::Witness => {
+                self.is_program_started = true;
+            }
+            AllocationMode::Constant => {
+                self.is_program_started = true;
+
+                let first_real = self.new_m31(variable.0 .0, AllocationMode::Constant);
+                let first_imag = self.new_m31(variable.0 .1, AllocationMode::Constant);
+                let second_real = self.new_m31(variable.1 .0, AllocationMode::Constant);
+                let second_imag = self.new_m31(variable.1 .1, AllocationMode::Constant);
+
+                let t = self.mul(first_imag, 2);
+                let a_wire = self.add(first_real, t);
+
+                let t = self.mul(second_imag, 2);
+                let t = self.add(second_real, t);
+                let b_wire = self.mul(t, 3);
+
+                self.a_wire.push(a_wire);
+                self.b_wire.push(b_wire);
+                self.c_wire.push(c_wire);
+                self.enforce_c_m31.push(0);
+                self.op.push(M31::one());
+            }
+        }
+
+        c_wire
     }
 
     pub fn pad(&mut self) {
+        println!(
+            "Before padding: Plonk circuit size: {}, Poseidon circuit size {}",
+            self.a_wire.len(),
+            self.flow.0.len()
+        );
+
+        assert!(self.mult_a.is_empty());
+        assert!(self.mult_b.is_empty());
+        assert!(self.mult_c.is_empty());
+        assert!(self.mult_poseidon.is_empty());
+
         // pad the Poseidon accelerator first
-        let poseidon_len = self.addr_1.len();
+        let poseidon_len = self.flow.0.len();
         let padded_poseidon_len = max(N_LANES * 2, poseidon_len.next_power_of_two());
 
         if padded_poseidon_len > poseidon_len {
-            let constant_1 = self.new_variables(&CONSTANT_1, AllocationMode::Constant);
-            let constant_2 = self.new_variables(&CONSTANT_2, AllocationMode::Constant);
-            let constant_3 = self.new_variables(&CONSTANT_3, AllocationMode::Constant);
-
-            let addr_1 = self.new_variables(&[M31::from(constant_1)], AllocationMode::Constant);
-            let addr_2 = self.new_variables(&[M31::from(constant_2)], AllocationMode::Constant);
-            let addr_3 = self.new_variables(&[M31::from(constant_3)], AllocationMode::Constant);
-
             for _ in poseidon_len..padded_poseidon_len {
-                self.invoke_poseidon_accelerator(addr_1, addr_1, addr_2, addr_3);
+                self.invoke_poseidon_accelerator(
+                    PoseidonEntry {
+                        addr: 0,
+                        sel: 0,
+                        hash: CONSTANT_1,
+                    },
+                    PoseidonEntry {
+                        addr: 0,
+                        sel: 0,
+                        hash: CONSTANT_1,
+                    },
+                    PoseidonEntry {
+                        addr: 0,
+                        sel: 0,
+                        hash: CONSTANT_2,
+                    },
+                    PoseidonEntry {
+                        addr: 0,
+                        sel: 0,
+                        hash: CONSTANT_3,
+                    },
+                );
             }
         }
 
         // pad the Plonk circuit
-        let plonk_len = self.variables.len();
+        let plonk_len = self.a_wire.len();
         let padded_plonk_len = plonk_len.next_power_of_two();
 
         for _ in plonk_len..padded_plonk_len {
-            self.variables.push(M31::zero());
             self.a_wire.push(0);
             self.b_wire.push(0);
-            self.mult.push(0);
-            self.mult_poseidon.push(0);
+            self.c_wire.push(0);
+            self.enforce_c_m31.push(0);
             self.op.push(M31::one());
-
-            self.mult[0] += 2;
         }
     }
 
     pub fn check_arithmetics(&self) {
-        assert_eq!(self.variables.len(), self.a_wire.len());
-        assert_eq!(self.variables.len(), self.b_wire.len());
-        assert_eq!(self.variables.len(), self.op.len());
-        assert_eq!(self.variables.len(), self.mult.len());
+        assert!(self.mult_a.is_empty());
+        assert!(self.mult_b.is_empty());
+        assert!(self.mult_c.is_empty());
+        assert!(self.mult_poseidon.is_empty());
 
-        let len = self.variables.len();
+        assert_eq!(self.a_wire.len(), self.b_wire.len());
+        assert_eq!(self.a_wire.len(), self.c_wire.len());
+        assert_eq!(self.a_wire.len(), self.op.len());
+        assert_eq!(self.a_wire.len(), self.enforce_c_m31.len());
+
+        let len = self.a_wire.len();
 
         for i in 0..len {
             assert_eq!(
-                self.variables[i],
+                self.variables[self.c_wire[i]],
                 self.op[i] * (self.variables[self.a_wire[i]] + self.variables[self.b_wire[i]])
                     + (M31::one() - self.op[i])
                         * self.variables[self.a_wire[i]]
                         * self.variables[self.b_wire[i]],
-                "Row {} is incorrect:\n - a_val = {},  b_val = {}, variable = {}\
-                \n - a_wire = {}, b_wire = {}, op = {}",
+                "Row {} is incorrect:\n - a_val = {},  b_val = {}, c_val = {}\
+                \n - a_wire = {}, b_wire = {}, c_wire = {}, op = {}",
                 i,
                 self.variables[self.a_wire[i]],
                 self.variables[self.b_wire[i]],
-                self.variables[i],
+                self.variables[self.c_wire[i]],
                 self.a_wire[i],
                 self.b_wire[i],
+                self.c_wire[i],
                 self.op[i]
             );
+
+            if !self.enforce_c_m31[i].is_zero() {
+                assert_eq!(
+                    QM31::from(self.variables[self.c_wire[i]].0 .0),
+                    self.variables[self.c_wire[i]],
+                    "Row {} requires c_val to be a M31, but c_val = {} at c_wire = {}",
+                    i,
+                    self.variables[self.c_wire[i]],
+                    self.c_wire[i]
+                );
+            }
         }
     }
 
-    pub fn check_logup_argument(&self) {
-        let len = self.variables.len();
+    pub fn populate_logup_arguments(&mut self) {
+        assert!(self.mult_a.is_empty());
+        assert!(self.mult_b.is_empty());
+        assert!(self.mult_c.is_empty());
+        assert!(self.mult_poseidon.is_empty());
 
+        let n_vars = self.variables.len();
         let mut counts = Vec::new();
-        counts.resize(len, 0isize);
+        counts.resize(n_vars, 0isize);
 
-        for i in 0..len {
-            counts[self.a_wire[i]] -= 1;
-            counts[self.b_wire[i]] -= 1;
-            counts[i] += self.mult[i] as isize;
+        let n_rows = self.a_wire.len();
+        assert!(n_rows.is_power_of_two());
+
+        for i in 0..n_rows {
+            counts[self.a_wire[i]] += 1;
+            counts[self.b_wire[i]] += 1;
+            counts[self.c_wire[i]] += 1;
         }
 
         for i in 0..self.num_input {
             counts[i + 1] += 1;
         }
 
-        for &i in self
-            .addr_1
-            .iter()
-            .chain(self.addr_2.iter())
-            .chain(self.addr_3.iter())
-            .chain(self.addr_4.iter())
-        {
-            counts[i] -= 1;
+        for (r1, r2, r3, r4) in self.flow.0.iter() {
+            counts[r1.addr] += 1;
+            counts[r2.addr] += 1;
+            counts[r3.addr] += 1;
+            counts[r4.addr] += 1;
         }
 
-        let mut counts_poseidon = Vec::new();
-        counts_poseidon.resize(len, 0isize);
+        let mut first_occurred = vec![false; n_vars];
+        let mut mult_a = Vec::with_capacity(n_rows);
+        let mut mult_b = Vec::with_capacity(n_rows);
+        let mut mult_c = Vec::with_capacity(n_rows);
 
-        for i in 0..len {
-            counts_poseidon[i] += self.mult_poseidon[i] as isize;
+        for i in 0..n_rows {
+            let w = self.a_wire[i];
+            if first_occurred[w] {
+                mult_a.push(1);
+            } else {
+                first_occurred[w] = true;
+                mult_a.push(1 - counts[w])
+            }
+
+            let w = self.b_wire[i];
+            if first_occurred[w] {
+                mult_b.push(1);
+            } else {
+                first_occurred[w] = true;
+                mult_b.push(1 - counts[w])
+            }
+
+            let w = self.c_wire[i];
+            if first_occurred[w] {
+                mult_c.push(1);
+            } else {
+                first_occurred[w] = true;
+                mult_c.push(1 - counts[w])
+            }
         }
 
-        for &i in self
-            .addr_1
-            .iter()
-            .chain(self.addr_2.iter())
-            .chain(self.addr_3.iter())
-            .chain(self.addr_4.iter())
-        {
-            counts_poseidon[self.variables[i].0 as usize] -= 1;
+        let mut mult_poseidon_vars = vec![0; n_vars];
+        for (r1, r2, r3, r4) in self.flow.0.iter() {
+            mult_poseidon_vars[r1.sel] += 1;
+            mult_poseidon_vars[r2.sel] += 1;
+            mult_poseidon_vars[r3.sel] += 1;
+            mult_poseidon_vars[r4.sel] += 1;
+        }
+        mult_poseidon_vars[0] = 0;
+
+        for i in 0..n_vars {
+            if mult_poseidon_vars[i] != 0 {
+                assert_eq!(counts[i], 1);
+            }
         }
 
-        for (k, &v) in counts.iter().enumerate() {
-            assert_eq!(v, 0, "LogUp argument does not match: {} {}", k, v);
+        let mut mult_poseidon = Vec::with_capacity(n_rows);
+        for i in 0..n_rows {
+            let r = mult_poseidon_vars[self.c_wire[i]];
+            if r != 0 {
+                mult_poseidon.push(r);
+            } else {
+                mult_poseidon.push(0);
+            }
         }
 
-        for (k, &v) in counts_poseidon.iter().enumerate() {
-            assert_eq!(
-                v, 0,
-                "LogUp argument for Poseidon does not match: {} {}",
-                k, v
-            );
-        }
+        self.mult_a = mult_a;
+        self.mult_b = mult_b;
+        self.mult_c = mult_c;
+        self.mult_poseidon = mult_poseidon;
     }
 
     pub fn check_poseidon_invocations(&self) {
-        for (((&addr_1, &addr_2), &addr_3), &addr_4) in self
-            .addr_1
-            .iter()
-            .zip(self.addr_2.iter())
-            .zip(self.addr_3.iter())
-            .zip(self.addr_4.iter())
-        {
-            let sel_1 = self.variables[addr_1].0 as usize;
-            let sel_2 = self.variables[addr_2].0 as usize;
-            let sel_3 = self.variables[addr_3].0 as usize;
-            let sel_4 = self.variables[addr_4].0 as usize;
+        let n_rows = self.a_wire.len();
+        let mut map = HashMap::new();
+        for i in 0..n_rows {
+            if self.mult_poseidon[i] != 0 {
+                let l = self.variables[self.a_wire[i]].to_m31_array();
+                let r = self.variables[self.b_wire[i]].to_m31_array();
+                map.insert(
+                    self.c_wire[i],
+                    [l[0], l[1], l[2], l[3], r[0], r[1], r[2], r[3]],
+                );
+            }
+        }
 
-            let mut state: [M31; 16] = std::array::from_fn(|i| {
-                if i < 8 {
-                    self.variables[sel_1 + i]
-                } else {
-                    self.variables[sel_2 + i - 8]
-                }
-            });
+        for (r1, r2, r3, r4) in self.flow.0.iter() {
+            assert_eq!(r1.sel, self.variables[r1.addr].0 .0 .0 as usize);
+            assert_eq!(r2.sel, self.variables[r2.addr].0 .0 .0 as usize);
+            assert_eq!(r3.sel, self.variables[r3.addr].0 .0 .0 as usize);
+            assert_eq!(r4.sel, self.variables[r4.addr].0 .0 .0 as usize);
+
+            if r1.sel != 0 {
+                assert_eq!(
+                    *map.get(&r1.sel).unwrap(),
+                    r1.hash,
+                    "error at {} {} {} {} -- {} {} {} {}",
+                    r1.addr,
+                    r2.addr,
+                    r3.addr,
+                    r4.addr,
+                    r1.sel,
+                    r2.sel,
+                    r3.sel,
+                    r4.sel
+                );
+            }
+            if r2.sel != 0 {
+                assert_eq!(*map.get(&r2.sel).unwrap(), r2.hash);
+            }
+            if r3.sel != 0 {
+                assert_eq!(*map.get(&r3.sel).unwrap(), r3.hash);
+            }
+            if r4.sel != 0 {
+                assert_eq!(*map.get(&r4.sel).unwrap(), r4.hash);
+            }
+
+            let mut state: [M31; 16] = [
+                r1.hash[0], r1.hash[1], r1.hash[2], r1.hash[3], r1.hash[4], r1.hash[5], r1.hash[6],
+                r1.hash[7], r2.hash[0], r2.hash[1], r2.hash[2], r2.hash[3], r2.hash[4], r2.hash[5],
+                r2.hash[6], r2.hash[7],
+            ];
+
             let initial_state = state.clone();
-            let expected: [M31; 16] = std::array::from_fn(|i| {
-                if i < 8 {
-                    self.variables[sel_3 + i]
-                } else {
-                    self.variables[sel_4 + i - 8]
-                }
-            });
 
+            let expected: [M31; 16] = [
+                r3.hash[0], r3.hash[1], r3.hash[2], r3.hash[3], r3.hash[4], r3.hash[5], r3.hash[6],
+                r3.hash[7], r4.hash[0], r4.hash[1], r4.hash[2], r4.hash[3], r4.hash[4], r4.hash[5],
+                r4.hash[6], r4.hash[7],
+            ];
             poseidon2_permute(&mut state);
             for i in 0..8 {
                 assert_eq!(expected[i], state[i] + initial_state[i]);
@@ -469,85 +603,105 @@ impl ConstraintSystem {
         }
     }
 
-    pub fn generate_circuit(&self) -> (PlonkWithAcceleratorCircuitTrace, PoseidonMetadata) {
-        assert!(self.variables.len().is_power_of_two());
-        assert!(self.variables.len() >= N_LANES);
+    pub fn generate_circuit(&self) -> (PlonkWithAcceleratorCircuitTrace, PoseidonFlow) {
+        assert!(self.a_wire.len().is_power_of_two());
+        assert!(self.a_wire.len() >= N_LANES);
+        assert!(!self.mult_a.is_empty());
+        assert!(!self.mult_b.is_empty());
+        assert!(!self.mult_c.is_empty());
+        assert!(!self.mult_poseidon.is_empty());
 
-        let log_n_rows = self.variables.len().ilog2();
+        let log_n_rows = self.a_wire.len().ilog2();
         let range = 0..(1 << log_n_rows);
+        let isize_to_m31 = |v: isize| {
+            if v.is_negative() {
+                M31::from((-v) as u32).neg()
+            } else {
+                M31::from(v as u32)
+            }
+        };
 
         let circuit = PlonkWithAcceleratorCircuitTrace {
-            mult: range.clone().map(|i| self.mult[i].into()).collect(),
+            mult_a: range
+                .clone()
+                .map(|i| isize_to_m31(self.mult_a[i]))
+                .collect(),
+            mult_b: range
+                .clone()
+                .map(|i| isize_to_m31(self.mult_b[i]))
+                .collect(),
+            mult_c: range
+                .clone()
+                .map(|i| isize_to_m31(self.mult_c[i]))
+                .collect(),
             mult_poseidon: range
                 .clone()
                 .map(|i| self.mult_poseidon[i].into())
                 .collect(),
+            enforce_c_m31: range
+                .clone()
+                .map(|i| self.enforce_c_m31[i].into())
+                .collect(),
             a_wire: range.clone().map(|i| self.a_wire[i].into()).collect(),
             b_wire: range.clone().map(|i| self.b_wire[i].into()).collect(),
-            c_wire: range.clone().map(|i| i.into()).collect(),
+            c_wire: range.clone().map(|i| self.c_wire[i].into()).collect(),
             op: range.clone().map(|i| self.op[i].into()).collect(),
-            a_val: range
+            a_val_0: range
                 .clone()
-                .map(|i| self.variables[self.a_wire[i]].into())
+                .map(|i| self.variables[self.a_wire[i]].0 .0.into())
                 .collect(),
-            b_val: range
+            a_val_1: range
                 .clone()
-                .map(|i| self.variables[self.b_wire[i]].into())
+                .map(|i| self.variables[self.a_wire[i]].0 .1.into())
                 .collect(),
-            c_val: range.clone().map(|i| self.variables[i].into()).collect(),
-        };
-
-        let mut data_flow = PoseidonDataFlow(HashMap::new());
-        for i in 0..(1 << log_n_rows) {
-            if self.mult_poseidon[i] != 0 {
-                data_flow
-                    .0
-                    .insert(i, std::array::from_fn(|offset| self.variables[i + offset]));
-            }
-        }
-        let mut prescribed_flow = PoseidonPrescribedFlow {
-            addr_1: vec![],
-            addr_2: vec![],
-            addr_3: vec![],
-            addr_4: vec![],
-        };
-        let mut control_flow = PoseidonControlFlow {
-            sel_1: vec![],
-            sel_2: vec![],
-            sel_3: vec![],
-            sel_4: vec![],
-        };
-
-        for (((&addr_1, &addr_2), &addr_3), &addr_4) in self
-            .addr_1
-            .iter()
-            .zip(self.addr_2.iter())
-            .zip(self.addr_3.iter())
-            .zip(self.addr_4.iter())
-        {
-            prescribed_flow.addr_1.push(addr_1);
-            prescribed_flow.addr_2.push(addr_2);
-            prescribed_flow.addr_3.push(addr_3);
-            prescribed_flow.addr_4.push(addr_4);
-
-            control_flow.sel_1.push(self.variables[addr_1].0 as usize);
-            control_flow.sel_2.push(self.variables[addr_2].0 as usize);
-            control_flow.sel_3.push(self.variables[addr_3].0 as usize);
-            control_flow.sel_4.push(self.variables[addr_4].0 as usize);
-        }
-
-        let metadata = PoseidonMetadata {
-            prescribed_flow,
-            control_flow,
-            data_flow,
+            a_val_2: range
+                .clone()
+                .map(|i| self.variables[self.a_wire[i]].1 .0.into())
+                .collect(),
+            a_val_3: range
+                .clone()
+                .map(|i| self.variables[self.a_wire[i]].1 .1.into())
+                .collect(),
+            b_val_0: range
+                .clone()
+                .map(|i| self.variables[self.b_wire[i]].0 .0.into())
+                .collect(),
+            b_val_1: range
+                .clone()
+                .map(|i| self.variables[self.b_wire[i]].0 .1.into())
+                .collect(),
+            b_val_2: range
+                .clone()
+                .map(|i| self.variables[self.b_wire[i]].1 .0.into())
+                .collect(),
+            b_val_3: range
+                .clone()
+                .map(|i| self.variables[self.b_wire[i]].1 .1.into())
+                .collect(),
+            c_val_0: range
+                .clone()
+                .map(|i| self.variables[self.c_wire[i]].0 .0.into())
+                .collect(),
+            c_val_1: range
+                .clone()
+                .map(|i| self.variables[self.c_wire[i]].0 .1.into())
+                .collect(),
+            c_val_2: range
+                .clone()
+                .map(|i| self.variables[self.c_wire[i]].1 .0.into())
+                .collect(),
+            c_val_3: range
+                .clone()
+                .map(|i| self.variables[self.c_wire[i]].1 .1.into())
+                .collect(),
         };
 
         println!(
             "Plonk circuit size: {}, Poseidon circuit size: {}",
             circuit.mult_poseidon.len(),
-            metadata.control_flow.sel_1.len()
+            self.flow.0.len()
         );
 
-        (circuit, metadata)
+        (circuit, self.flow.clone())
     }
 }

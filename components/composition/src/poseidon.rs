@@ -2,6 +2,7 @@ use crate::data_structures::{EvalAtRowVar, RelationEntryVar};
 use circle_plonk_dsl_constraint_system::dvar::{AllocVar, DVar};
 use circle_plonk_dsl_data_structures::PlonkWithAcceleratorLookupElementsVar;
 use circle_plonk_dsl_fields::{M31Var, QM31Var};
+use std::ops::Add;
 use stwo_prover::constraint_framework::preprocessed_columns::PreprocessedColumn;
 use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::vcs::poseidon31_ref::{
@@ -90,6 +91,21 @@ pub fn evaluate_poseidon<'a>(
     let sel_2 = eval.next_trace_mask();
     let sel_3 = eval.next_trace_mask();
     let sel_4 = eval.next_trace_mask();
+
+    let sel_1_inv = eval.next_trace_mask();
+    let sel_2_inv = eval.next_trace_mask();
+    let sel_3_inv = eval.next_trace_mask();
+    let sel_4_inv = eval.next_trace_mask();
+
+    let is_sel_1_nonzero = &sel_1 * &sel_1_inv;
+    let is_sel_2_nonzero = &sel_2 * &sel_2_inv;
+    let is_sel_3_nonzero = &sel_3 * &sel_3_inv;
+    let is_sel_4_nonzero = &sel_4 * &sel_4_inv;
+
+    eval.add_constraint(&(-&is_sel_1_nonzero).add(&M31Var::one(&cs)) * &sel_1);
+    eval.add_constraint(&(-&is_sel_2_nonzero).add(&M31Var::one(&cs)) * &sel_2);
+    eval.add_constraint(&(-&is_sel_3_nonzero).add(&M31Var::one(&cs)) * &sel_3);
+    eval.add_constraint(&(-&is_sel_4_nonzero).add(&M31Var::one(&cs)) * &sel_4);
 
     let mut state: [_; 16] = std::array::from_fn(|_| eval.next_trace_mask());
 
@@ -188,7 +204,7 @@ pub fn evaluate_poseidon<'a>(
 
     eval.add_to_relation(RelationEntryVar::new(
         lookup_elements,
-        QM31Var::one(&cs),
+        is_sel_1_nonzero,
         &[
             -&sel_1,
             initial_state[0].clone(),
@@ -204,7 +220,7 @@ pub fn evaluate_poseidon<'a>(
 
     eval.add_to_relation(RelationEntryVar::new(
         lookup_elements,
-        QM31Var::one(&cs),
+        is_sel_2_nonzero,
         &[
             -&sel_2,
             initial_state[8].clone(),
@@ -220,7 +236,7 @@ pub fn evaluate_poseidon<'a>(
 
     eval.add_to_relation(RelationEntryVar::new(
         lookup_elements,
-        QM31Var::one(&cs),
+        is_sel_3_nonzero,
         &[
             -&sel_3,
             state[0].clone(),
@@ -236,7 +252,7 @@ pub fn evaluate_poseidon<'a>(
 
     eval.add_to_relation(RelationEntryVar::new(
         lookup_elements,
-        QM31Var::one(&cs),
+        is_sel_4_nonzero,
         &[
             -&sel_4,
             state[8].clone(),

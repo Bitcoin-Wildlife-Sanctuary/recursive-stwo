@@ -7,7 +7,7 @@ use stwo_prover::core::circle::CirclePoint;
 use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::fields::qm31::SecureField;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct CirclePointQM31Var {
     pub x: QM31Var,
     pub y: QM31Var,
