@@ -1,7 +1,7 @@
 use crate::implementation::poseidon2_permute;
 use circle_plonk_dsl_constraint_system::dvar::{AllocVar, AllocationMode, DVar};
 use circle_plonk_dsl_constraint_system::ConstraintSystemRef;
-use circle_plonk_dsl_fields::QM31Var;
+use circle_plonk_dsl_fields::{M31Var, QM31Var};
 use num_traits::Zero;
 use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::fields::qm31::QM31;
@@ -18,7 +18,7 @@ pub struct Poseidon2HalfStateRef {
     pub right_variable: usize,
     pub half_state_variable: usize,
     pub addr_variable: usize,
-    pub is_used: bool,
+    pub disabled: bool,
 }
 
 impl Poseidon2HalfStateRef {
@@ -34,7 +34,30 @@ impl Poseidon2HalfStateRef {
             right_variable: 0,
             half_state_variable: 0,
             addr_variable: 0,
-            is_used: false,
+            disabled: false,
+        }
+    }
+
+    pub fn from_m31(slice: &[M31Var]) -> Self {
+        assert_eq!(slice.len(), 8);
+        let left_variable = QM31Var::from_m31(&slice[0], &slice[1], &slice[2], &slice[3]);
+        let right_variable = QM31Var::from_m31(&slice[4], &slice[5], &slice[6], &slice[7]);
+
+        let cs = left_variable.cs().and(&right_variable.cs());
+        let left_variable = left_variable.variable;
+        let right_variable = right_variable.variable;
+
+        let half_state_variable = cs.mul(left_variable, right_variable);
+        let addr_variable = cs.new_m31(M31::from(half_state_variable), AllocationMode::Constant);
+
+        Poseidon2HalfStateRef {
+            cs,
+            value: std::array::from_fn(|i| slice[i].value),
+            left_variable,
+            right_variable,
+            half_state_variable,
+            addr_variable,
+            disabled: false,
         }
     }
 
@@ -55,8 +78,49 @@ impl Poseidon2HalfStateRef {
             right_variable,
             half_state_variable,
             addr_variable,
-            is_used: false,
+            disabled: false,
         }
+    }
+
+    pub fn swap_compress(
+        a0: &Poseidon2HalfStateRef,
+        a1: &Poseidon2HalfStateRef,
+        bit: &M31Var,
+    ) -> Poseidon2HalfStateRef {
+        if a0.addr_variable == 0 {
+            assert!(!a0.disabled);
+        }
+        if a1.addr_variable == 0 {
+            assert!(!a1.disabled);
+        }
+
+        let cs = a0.cs.and(&a1.cs).and(&bit.cs);
+        let bit_neg = &M31Var::one(&cs) - bit;
+
+        let a0_addr = M31Var {
+            cs: cs.clone(),
+            value: M31::from(a0.half_state_variable),
+            variable: a0.addr_variable,
+        };
+        let a1_addr = M31Var {
+            cs: cs.clone(),
+            value: M31::from(a1.half_state_variable),
+            variable: a1.addr_variable,
+        };
+
+        let new_a0_addr = &(&a0_addr * &bit_neg) + &(&a1_addr * bit);
+        let new_a1_addr = &(&a0_addr + &a1_addr) - &new_a0_addr;
+
+        let (mut left, mut right) = if bit.value.is_zero() {
+            (a0.clone(), a1.clone())
+        } else {
+            (a1.clone(), a0.clone())
+        };
+        left.addr_variable = new_a0_addr.variable;
+        right.addr_variable = new_a1_addr.variable;
+
+        let (digest, _) = Self::permute(&mut left, &mut right, false, true);
+        digest
     }
 }
 
@@ -92,7 +156,7 @@ impl AllocVar for Poseidon2HalfStateRef {
             right_variable,
             half_state_variable,
             addr_variable,
-            is_used: false,
+            disabled: false,
         }
     }
 }
@@ -107,7 +171,7 @@ impl Poseidon2HalfStateRef {
                 right_variable: 0,
                 half_state_variable: cs.get_cache("poseidon2 zero_half").unwrap(),
                 addr_variable,
-                is_used: false,
+                disabled: false,
             }
         } else {
             let half_state_variable = cs.mul(0, 0);
@@ -123,7 +187,7 @@ impl Poseidon2HalfStateRef {
                 right_variable: 0,
                 half_state_variable,
                 addr_variable,
-                is_used: false,
+                disabled: false,
             }
         }
     }
@@ -155,13 +219,13 @@ impl Poseidon2HalfStateRef {
         let cs = left.cs().and(&right.cs());
 
         if left.addr_variable == 0 {
-            assert!(!left.is_used);
-            left.is_used = true;
+            assert!(!left.disabled);
+            left.disabled = true;
         }
 
         if right.addr_variable == 0 {
-            assert!(!right.is_used);
-            right.is_used = true;
+            assert!(!right.disabled);
+            right.disabled = true;
         }
 
         let mut state: [M31; 16] = std::array::from_fn(|i| {
@@ -186,7 +250,7 @@ impl Poseidon2HalfStateRef {
                 right_variable: 0,
                 half_state_variable: 0,
                 addr_variable: 0,
-                is_used: true,
+                disabled: true,
             }
         } else {
             let left_variable =
@@ -206,7 +270,7 @@ impl Poseidon2HalfStateRef {
                 right_variable,
                 half_state_variable,
                 addr_variable,
-                is_used: false,
+                disabled: false,
             }
         };
 
@@ -218,7 +282,7 @@ impl Poseidon2HalfStateRef {
                 right_variable: 0,
                 half_state_variable: 0,
                 addr_variable: 0,
-                is_used: true,
+                disabled: true,
             }
         } else {
             let left_variable = QM31Var::new_witness(
@@ -242,7 +306,7 @@ impl Poseidon2HalfStateRef {
                 right_variable,
                 half_state_variable,
                 addr_variable,
-                is_used: false,
+                disabled: false,
             }
         };
 

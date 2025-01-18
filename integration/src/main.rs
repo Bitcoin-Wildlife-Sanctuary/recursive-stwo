@@ -24,7 +24,7 @@ fn main() {
     let fiat_shamir_hints = FiatShamirHints::new(&proof, config);
 
     let cs = ConstraintSystemRef::new_ref();
-    let mut proof_var = PlonkWithPoseidonProofVar::new_constant(&cs, &proof);
+    let mut proof_var = PlonkWithPoseidonProofVar::new_witness(&cs, &proof);
 
     let results = FiatShamirResults::compute(&fiat_shamir_hints, &mut proof_var);
     CompositionCheck::compute(

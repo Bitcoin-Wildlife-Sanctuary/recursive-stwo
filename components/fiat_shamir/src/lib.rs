@@ -131,8 +131,11 @@ impl FiatShamirResults {
         }
 
         // enforce the total sum
-        let one_sum = (&(&(&lookup_elements.alpha * &M31Var::one(&cs)) + &M31Var::one(&cs)) - &lookup_elements.z).inv();
-        (&(&one_sum + &proof.stmt1.poseidon_total_sum) + &proof.stmt1.plonk_total_sum).equalverify(&QM31Var::zero(&cs));
+        let one_sum = (&(&(&lookup_elements.alpha * &M31Var::one(&cs)) + &M31Var::one(&cs))
+            - &lookup_elements.z)
+            .inv();
+        (&(&one_sum + &proof.stmt1.poseidon_total_sum) + &proof.stmt1.plonk_total_sum)
+            .equalverify(&QM31Var::zero(&cs));
 
         // assumption: no duplicated queries in the first attempt
         let mut sorted_queries = vec![];
@@ -209,7 +212,7 @@ mod test {
         let fiat_shamir_hints = FiatShamirHints::new(&proof, config);
 
         let cs = ConstraintSystemRef::new_ref();
-        let mut proof_var = PlonkWithPoseidonProofVar::new_constant(&cs, &proof);
+        let mut proof_var = PlonkWithPoseidonProofVar::new_witness(&cs, &proof);
 
         let _results = FiatShamirResults::compute(&fiat_shamir_hints, &mut proof_var);
 

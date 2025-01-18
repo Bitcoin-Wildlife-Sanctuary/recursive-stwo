@@ -1,10 +1,13 @@
 [package]
-name = "circle-plonk-dsl-channel"
+name = "circle-plonk-dsl-merkle"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
 stwo-prover.workspace = true
+circle-plonk-dsl-fields = { path = "../fields" }
 circle-plonk-dsl-constraint-system = { path = "../../dsl/constraint_system" }
 circle-plonk-dsl-poseidon31 = { path = "../poseidon31" }
-circle-plonk-dsl-fields = { path = "../fields" }
+
+[dev-dependencies]
+rand.workspace = true

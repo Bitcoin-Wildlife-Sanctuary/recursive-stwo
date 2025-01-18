@@ -524,6 +524,7 @@ impl ConstraintSystem {
             let r = mult_poseidon_vars[self.c_wire[i]];
             if r != 0 {
                 mult_poseidon.push(r);
+                mult_poseidon_vars[self.c_wire[i]] = 0;
             } else {
                 mult_poseidon.push(0);
             }

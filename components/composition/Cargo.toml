@@ -14,5 +14,4 @@ bincode.workspace = true
 itertools.workspace = true
 
 [dev-dependencies]
-circle-plonk-dsl-fiat-shamir = { path = "../fiat_shamir" }
 num-traits = "0.2.19"

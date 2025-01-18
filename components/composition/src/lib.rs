@@ -143,20 +143,20 @@ mod test {
         let fiat_shamir_hints = FiatShamirHints::new(&proof, config);
 
         let cs = ConstraintSystemRef::new_ref();
-        let proof_var = PlonkWithPoseidonProofVar::new_constant(&cs, &proof);
+        let proof_var = PlonkWithPoseidonProofVar::new_witness(&cs, &proof);
 
         CompositionCheck::compute(
             &fiat_shamir_hints,
             &PlonkWithAcceleratorLookupElementsVar {
                 cs: cs.clone(),
-                z: QM31Var::new_constant(&cs, &fiat_shamir_hints.z),
-                alpha: QM31Var::new_constant(&cs, &fiat_shamir_hints.alpha),
+                z: QM31Var::new_witness(&cs, &fiat_shamir_hints.z),
+                alpha: QM31Var::new_witness(&cs, &fiat_shamir_hints.alpha),
                 alpha_powers: std::array::from_fn(|i| {
-                    QM31Var::new_constant(&cs, &fiat_shamir_hints.alpha.pow(i as u128))
+                    QM31Var::new_witness(&cs, &fiat_shamir_hints.alpha.pow(i as u128))
                 }),
             },
-            QM31Var::new_constant(&cs, &fiat_shamir_hints.random_coeff),
-            CirclePointQM31Var::new_constant(&cs, &fiat_shamir_hints.oods_point),
+            QM31Var::new_witness(&cs, &fiat_shamir_hints.random_coeff),
+            CirclePointQM31Var::new_witness(&cs, &fiat_shamir_hints.oods_point),
             &proof_var,
         );
 
