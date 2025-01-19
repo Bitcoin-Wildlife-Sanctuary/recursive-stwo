@@ -1,4 +1,4 @@
-use circle_plonk_dsl_bits::{get_lower_bits_checked, BitsVar};
+use circle_plonk_dsl_bits::BitsVar;
 use circle_plonk_dsl_channel::{ChannelVar, HashVar};
 use circle_plonk_dsl_circle::CirclePointQM31Var;
 use circle_plonk_dsl_constraint_system::dvar::DVar;
@@ -7,7 +7,6 @@ use circle_plonk_dsl_data_structures::{
 };
 use circle_plonk_dsl_fields::{M31Var, QM31Var};
 use circle_plonk_dsl_hints::FiatShamirHints;
-use std::cmp::max;
 use stwo_prover::core::fields::FieldExpOps;
 
 pub struct FiatShamirResults {
@@ -22,7 +21,7 @@ pub struct FiatShamirResults {
     pub random_coeff: QM31Var,
     pub after_sampled_values_random_coeff: QM31Var,
     pub oods_point: CirclePointQM31Var,
-    pub queries: Vec<M31Var>,
+    pub raw_queries: Vec<M31Var>,
 }
 
 impl FiatShamirResults {
@@ -101,7 +100,8 @@ impl FiatShamirResults {
 
         channel.absorb_one_felt_and_permute(&nonce_felt);
 
-        let lower_bits = get_lower_bits_checked(&channel.digest.to_qm31()[0].decompose()[0], 20);
+        let lower_bits = BitsVar::from_m31(&channel.digest.to_qm31()[0].decompose_m31()[0], 31)
+            .compose_range(0..20);
         lower_bits.equalverify(&M31Var::zero(&cs));
 
         let mut raw_queries = Vec::with_capacity(16);
@@ -115,19 +115,7 @@ impl FiatShamirResults {
             draw_queries_felts.push(b);
         }
         for felt in draw_queries_felts.iter() {
-            raw_queries.extend_from_slice(&felt.decompose());
-        }
-
-        let mut queries = Vec::with_capacity(16);
-        let max_column_log_size = max(
-            proof.stmt0.log_size_plonk.value.0 + 1,
-            proof.stmt0.log_size_poseidon.value.0 + 2,
-        ) + 5;
-        for raw_query in raw_queries.iter() {
-            queries.push(get_lower_bits_checked(
-                raw_query,
-                max_column_log_size as usize,
-            ));
+            raw_queries.extend_from_slice(&felt.decompose_m31());
         }
 
         // enforce the total sum
@@ -136,16 +124,6 @@ impl FiatShamirResults {
             .inv();
         (&(&one_sum + &proof.stmt1.poseidon_total_sum) + &proof.stmt1.plonk_total_sum)
             .equalverify(&QM31Var::zero(&cs));
-
-        // assumption: no duplicated queries in the first attempt
-        let mut sorted_queries = vec![];
-        for query in queries.iter() {
-            sorted_queries.push(query.value.0 as usize);
-        }
-        sorted_queries.sort_unstable();
-        sorted_queries.dedup();
-        assert_eq!(sorted_queries.len(), 16);
-        assert_eq!(sorted_queries, fiat_shamir_hints.queries);
 
         assert_eq!(lookup_elements.z.value, fiat_shamir_hints.z);
         assert_eq!(lookup_elements.alpha.value, fiat_shamir_hints.alpha);
@@ -177,7 +155,7 @@ impl FiatShamirResults {
             random_coeff,
             after_sampled_values_random_coeff,
             oods_point,
-            queries,
+            raw_queries,
         }
     }
 }

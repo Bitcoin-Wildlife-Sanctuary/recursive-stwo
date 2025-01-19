@@ -1,5 +1,6 @@
 use itertools::Itertools;
 use num_traits::{One, Zero};
+use std::collections::{BTreeMap, BTreeSet};
 use stwo_prover::constraint_framework::{Relation, PREPROCESSED_TRACE_IDX};
 use stwo_prover::core::air::{Component, Components};
 use stwo_prover::core::channel::{Channel, Poseidon31Channel};
@@ -34,7 +35,12 @@ pub struct FiatShamirHints {
     pub inner_layer_commitments: Vec<Poseidon31Hash>,
     pub last_layer_evaluation: SecureField,
     pub fri_alphas: Vec<SecureField>,
-    pub queries: Vec<usize>,
+
+    pub all_log_sizes: BTreeSet<u32>,
+    pub max_first_layer_column_log_size: u32,
+    pub query_positions_per_log_size: BTreeMap<u32, Vec<usize>>,
+    pub column_log_sizes: TreeVec<Vec<u32>>,
+    pub n_columns_per_log_size: TreeVec<BTreeMap<u32, usize>>,
 
     pub plonk_tree_subspan: Vec<TreeSubspan>,
     pub poseidon_tree_subspan: Vec<TreeSubspan>,
@@ -167,14 +173,21 @@ impl FiatShamirHints {
 
         // Get FRI query positions.
         let query_positions_per_log_size = fri_verifier.sample_query_positions(channel);
-        let max_first_layer_column_log_size = fri_verifier
+        let all_log_sizes = fri_verifier
             .first_layer
             .column_commitment_domains
             .iter()
             .map(|domain| domain.log_size())
-            .max()
-            .unwrap();
-        let queries = query_positions_per_log_size[&max_first_layer_column_log_size].clone();
+            .collect::<BTreeSet<u32>>();
+        let max_first_layer_column_log_size = *all_log_sizes.iter().max().unwrap();
+        let column_log_sizes = commitment_scheme
+            .trees
+            .as_ref()
+            .map(|tree| tree.column_log_sizes.clone());
+        let n_columns_per_log_size = commitment_scheme
+            .trees
+            .as_ref()
+            .map(|tree| tree.n_columns_per_log_size.clone());
 
         FiatShamirHints {
             preprocessed_commitment: proof.stark_proof.commitments[0],
@@ -192,7 +205,13 @@ impl FiatShamirHints {
             inner_layer_commitments,
             last_layer_evaluation,
             fri_alphas,
-            queries,
+
+            all_log_sizes,
+            max_first_layer_column_log_size,
+            query_positions_per_log_size,
+            column_log_sizes,
+            n_columns_per_log_size,
+
             plonk_tree_subspan,
             poseidon_tree_subspan,
             plonk_prepared_column_indices,

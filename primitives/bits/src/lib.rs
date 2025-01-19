@@ -2,7 +2,7 @@ use circle_plonk_dsl_constraint_system::dvar::{AllocVar, AllocationMode, DVar};
 use circle_plonk_dsl_constraint_system::ConstraintSystemRef;
 use circle_plonk_dsl_fields::M31Var;
 use num_traits::{One, Zero};
-use std::ops::Neg;
+use std::ops::{Neg, Range};
 use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::fields::qm31::QM31;
 
@@ -70,27 +70,59 @@ impl BitsVar {
         }
         reconstructed.equalverify(v);
 
+        if l == 31 {
+            let mut product = cs.mul(res.variables[0], res.variables[1]);
+            for i in 2..l {
+                product = cs.mul(product, res.variables[i]);
+            }
+            cs.enforce_zero(product);
+        }
+
         res
     }
-}
 
-pub fn get_lower_bits_checked(v: &M31Var, n: usize) -> M31Var {
-    let cs = v.cs();
+    pub fn subslice(&self, range: Range<usize>) -> BitsVar {
+        BitsVar {
+            cs: self.cs.clone(),
+            value: self.value[range.clone()].to_vec(),
+            variables: self.variables[range].to_vec(),
+        }
+    }
 
-    let high_bits = M31Var::new_witness(&cs, &M31::from(v.value.0 >> n));
-    let _ = BitsVar::from_m31(&high_bits, 31 - n);
+    pub fn get_value(&self) -> M31 {
+        let mut sum_value = M31::zero();
 
-    let high_bits_shifted = high_bits.mul_constant(M31::from(1 << n));
-    let lower_bits = v - &high_bits_shifted;
+        for (shift, &i) in self.value.iter().enumerate() {
+            if i {
+                sum_value += M31::from(1 << shift);
+            }
+        }
 
-    let _ = BitsVar::from_m31(&lower_bits, n);
+        sum_value
+    }
 
-    let is_high_bits_all_1 =
-        high_bits.is_eq(&M31Var::new_constant(&cs, &M31::from((1 << (31 - n)) - 1)));
-    let is_low_bits_all_1 = lower_bits.is_eq(&M31Var::new_constant(&cs, &M31::from((1 << n) - 1)));
+    pub fn compose_range(&self, range: Range<usize>) -> M31Var {
+        let cs = self.cs();
 
-    let no_corner_case = &is_high_bits_all_1 * &is_low_bits_all_1;
-    no_corner_case.equalverify(&M31Var::zero(&cs));
+        let mut sum_value = if self.value[range.start] {
+            M31::one()
+        } else {
+            M31::zero()
+        };
+        let mut sum_variable = self.variables[range.start];
 
-    lower_bits
+        for (shift, i) in (range.start + 1..range.end).enumerate() {
+            if self.value[i] {
+                sum_value += M31::from(1 << (shift + 1));
+            }
+            let shifted_variable = cs.mul_constant(self.variables[i], M31::from(1 << (shift + 1)));
+            sum_variable = cs.add(sum_variable, shifted_variable);
+        }
+
+        M31Var {
+            cs,
+            value: sum_value,
+            variable: sum_variable,
+        }
+    }
 }

@@ -99,6 +99,10 @@ impl ConstraintSystemRef {
     pub fn generate_circuit(&self) -> (PlonkWithAcceleratorCircuitTrace, PoseidonFlow) {
         self.0.borrow().generate_circuit()
     }
+
+    pub fn num_plonk_rows(&self) -> usize {
+        self.0.borrow().a_wire.len()
+    }
 }
 
 #[derive(Debug)]

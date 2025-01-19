@@ -263,7 +263,7 @@ impl QM31Var {
         }
     }
 
-    pub fn decompose(&self) -> [M31Var; 4] {
+    pub fn decompose_m31(&self) -> [M31Var; 4] {
         let cs = self.cs();
 
         let a0 = M31Var::new_witness(&cs, &self.value.0 .0);
@@ -277,6 +277,36 @@ impl QM31Var {
         cs.insert_gate(l, r, self.variable, M31::one());
 
         [a0, a1, a2, a3]
+    }
+
+    pub fn decompose_cm31(&self) -> [CM31Var; 2] {
+        let v = self.decompose_m31();
+
+        let a0 = &CM31Var::from(&v[1]).shift_by_i() + &v[0];
+        let a1 = &CM31Var::from(&v[3]).shift_by_i() + &v[2];
+
+        [a0, a1]
+    }
+
+    pub fn pow(&self, mut exp: u128) -> Self {
+        let cs = self.cs();
+        let mut bools = vec![];
+
+        while exp > 0 {
+            bools.push(exp & 1 != 0);
+            exp >>= 1;
+        }
+
+        let mut cur = QM31Var::one(&cs);
+        for (i, &b) in bools.iter().enumerate().rev() {
+            if b {
+                cur = &cur * self;
+            }
+            if i != 0 {
+                cur = &cur * &cur;
+            }
+        }
+        cur
     }
 
     pub fn from_cm31(a0: &CM31Var, a1: &CM31Var) -> Self {
@@ -390,5 +420,66 @@ impl QM31Var {
 
     pub fn shift_by_ij(&self) -> QM31Var {
         self.shift_by_i().shift_by_j()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::QM31Var;
+    use circle_plonk_dsl_constraint_system::dvar::AllocVar;
+    use circle_plonk_dsl_constraint_system::ConstraintSystemRef;
+    use num_traits::One;
+    use rand::prelude::SmallRng;
+    use rand::{Rng, SeedableRng};
+    use stwo_prover::core::fields::qm31::QM31;
+    use stwo_prover::core::fields::FieldExpOps;
+    use stwo_prover::core::fri::FriConfig;
+    use stwo_prover::core::pcs::PcsConfig;
+    use stwo_prover::core::vcs::poseidon31_merkle::Poseidon31MerkleChannel;
+    use stwo_prover::examples::plonk_with_poseidon::air::{
+        prove_plonk_with_poseidon, verify_plonk_with_poseidon,
+    };
+
+    #[test]
+    fn test_qm31_pow() {
+        let config = PcsConfig {
+            pow_bits: 20,
+            fri_config: FriConfig::new(0, 5, 16),
+        };
+
+        let mut prng = SmallRng::seed_from_u64(0);
+        let a: QM31 = prng.gen();
+        let exp = 100u128;
+        let b = a.pow(exp);
+
+        let cs = ConstraintSystemRef::new_ref();
+
+        let a_var = QM31Var::new_witness(&cs, &a);
+        let b_var = QM31Var::new_witness(&cs, &b);
+        a_var.pow(exp).equalverify(&b_var);
+
+        cs.pad();
+        cs.check_arithmetics();
+        cs.populate_logup_arguments();
+        cs.check_poseidon_invocations();
+
+        let (plonk, mut poseidon) = cs.generate_circuit();
+        let proof = prove_plonk_with_poseidon::<Poseidon31MerkleChannel>(
+            plonk.mult_a.length.ilog2(),
+            poseidon.0.len().ilog2(),
+            config,
+            &plonk,
+            &mut poseidon,
+        );
+        verify_plonk_with_poseidon::<Poseidon31MerkleChannel>(
+            proof,
+            config,
+            &[
+                (1, QM31::one()),
+                (2, QM31::from_u32_unchecked(0, 1, 0, 0)),
+                (3, QM31::from_u32_unchecked(0, 0, 1, 0)),
+            ],
+        )
+        .unwrap();
     }
 }
