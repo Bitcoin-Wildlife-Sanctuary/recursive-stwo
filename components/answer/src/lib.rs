@@ -8,7 +8,7 @@ use circle_plonk_dsl_constraint_system::dvar::{AllocVar, DVar};
 use circle_plonk_dsl_data_structures::PlonkWithPoseidonProofVar;
 use circle_plonk_dsl_fiat_shamir::FiatShamirResults;
 use circle_plonk_dsl_fields::{M31Var, QM31Var};
-use circle_plonk_dsl_hints::{FRIAnswerHints, FiatShamirHints};
+use circle_plonk_dsl_hints::{AnswerHints, FiatShamirHints};
 use itertools::{izip, multiunzip, Itertools};
 use std::cmp::Reverse;
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -28,7 +28,7 @@ impl FRIAnswerResults {
         oods_point: &CirclePointQM31Var,
         fiat_shamir_hints: &FiatShamirHints,
         fiat_shamir_results: &FiatShamirResults,
-        fri_answer_hints: &FRIAnswerHints,
+        fri_answer_hints: &AnswerHints,
         proof: &PlonkWithPoseidonProofVar,
     ) {
         let cs = oods_point.cs();
@@ -309,7 +309,7 @@ mod test {
     use circle_plonk_dsl_constraint_system::ConstraintSystemRef;
     use circle_plonk_dsl_data_structures::PlonkWithPoseidonProofVar;
     use circle_plonk_dsl_fiat_shamir::FiatShamirResults;
-    use circle_plonk_dsl_hints::{FRIAnswerHints, FiatShamirHints};
+    use circle_plonk_dsl_hints::{AnswerHints, FiatShamirHints};
     use num_traits::One;
     use stwo_prover::core::fields::qm31::QM31;
     use stwo_prover::core::fri::FriConfig;
@@ -336,7 +336,7 @@ mod test {
         let mut proof_var = PlonkWithPoseidonProofVar::new_witness(&cs, &proof);
 
         let fiat_shamir_results = FiatShamirResults::compute(&fiat_shamir_hints, &mut proof_var);
-        let fri_answer_hints = FRIAnswerHints::compute(&fiat_shamir_hints, &proof);
+        let fri_answer_hints = AnswerHints::compute(&fiat_shamir_hints, &proof);
 
         FRIAnswerResults::compute(
             &CirclePointQM31Var::new_witness(&cs, &fiat_shamir_hints.oods_point),

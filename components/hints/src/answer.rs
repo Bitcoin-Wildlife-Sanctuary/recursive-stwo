@@ -14,12 +14,12 @@ pub struct SampledValuesPerLogSize(pub BTreeMap<u32, ColumnVec<BaseField>>);
 #[derive(Debug, Default)]
 pub struct SampledValues(pub BTreeMap<u32, SampledValuesPerLogSize>);
 
-pub struct FRIAnswerHints {
+pub struct AnswerHints {
     pub fri_answers: ColumnVec<Vec<SecureField>>,
     pub sampled_values: SampledValues,
 }
 
-impl FRIAnswerHints {
+impl AnswerHints {
     pub fn compute(
         fiat_shamir_hints: &FiatShamirHints,
         proof: &PlonkWithPoseidonProof<Poseidon31MerkleHasher>,
@@ -91,7 +91,7 @@ impl FRIAnswerHints {
 
 #[cfg(test)]
 mod test {
-    use crate::{FRIAnswerHints, FiatShamirHints};
+    use crate::{AnswerHints, FiatShamirHints};
     use stwo_prover::core::fri::FriConfig;
     use stwo_prover::core::pcs::PcsConfig;
     use stwo_prover::core::vcs::poseidon31_merkle::Poseidon31MerkleHasher;
@@ -107,6 +107,6 @@ mod test {
         };
 
         let fiat_shamir_hints = FiatShamirHints::new(&proof, config);
-        let fri_answer_hints = FRIAnswerHints::compute(&fiat_shamir_hints, &proof);
+        let _fri_answer_hints = AnswerHints::compute(&fiat_shamir_hints, &proof);
     }
 }
