@@ -1,5 +1,5 @@
 use crate::{AnswerHints, FiatShamirHints};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use stwo_prover::core::fields::m31::{BaseField, M31};
 use stwo_prover::core::vcs::ops::MerkleHasher;
 use stwo_prover::core::vcs::poseidon31_hash::Poseidon31Hash;
@@ -25,7 +25,7 @@ impl StandaloneMerkleProof {
             &self.columns.get(&self.depth).unwrap_or(&vec![]),
         );
 
-        for i in 0..self.depth - 1 {
+        for i in 0..self.depth {
             let h = self.depth - i - 1;
 
             cur_hash = Poseidon31MerkleHasher::hash_node(
@@ -45,7 +45,7 @@ impl StandaloneMerkleProof {
         max_log_size: u32,
         queries: &[usize],
         values: &[BaseField],
-        _root: Poseidon31Hash,
+        root: Poseidon31Hash,
         n_columns_per_log_size: &BTreeMap<u32, usize>,
         merkle_decommitment: &MerkleDecommitment<Poseidon31MerkleHasher>,
     ) -> Vec<StandaloneMerkleProof> {
@@ -54,19 +54,14 @@ impl StandaloneMerkleProof {
         queries.sort_unstable();
         queries.dedup();
 
-        // get the number of columns
-        let column_num = values.len();
-        println!("{:?}", queries);
-        println!("{:?}", column_num);
-        println!("{:?}", n_columns_per_log_size);
-
         // create the new value map
-        let mut iter = values.into_iter();
+        let mut value_iterator = values.into_iter();
+
         let mut queries_values_map = HashMap::new();
         for &query in queries.iter() {
             let mut v = vec![];
             for _ in 0..*n_columns_per_log_size.get(&max_log_size).unwrap() {
-                v.push(*iter.next().unwrap());
+                v.push(*value_iterator.next().unwrap());
             }
             queries_values_map.insert(query, v);
         }
@@ -79,16 +74,112 @@ impl StandaloneMerkleProof {
         let mut hash_iterator = merkle_decommitment.hash_witness.iter();
 
         // create the merkle partial tree
-        let mut layers: Vec<HashMap<usize, Poseidon31Hash>> = vec![];
+        let mut hash_layers: Vec<HashMap<usize, Poseidon31Hash>> = vec![];
 
         // create the leaf layer
-        let mut layer = HashMap::new();
+        let mut hash_layer = HashMap::new();
         for (&query, value) in queries_values_map.iter() {
-            layer.insert(query, Poseidon31MerkleHasher::hash_node(None, value));
+            hash_layer.insert(query, Poseidon31MerkleHasher::hash_node(None, value));
         }
-        layers.push(layer);
+        hash_layers.push(hash_layer);
 
-        todo!()
+        let mut positions = queries.to_vec();
+        positions.sort_unstable();
+
+        // create the intermediate layers
+        let mut column_layers: Vec<HashMap<usize, Vec<M31>>> = vec![];
+        for i in 0..max_log_size as usize {
+            let mut layer = HashMap::new();
+            let mut parents = BTreeSet::new();
+            let mut column_layer = HashMap::new();
+
+            for &position in positions.iter() {
+                if !layer.contains_key(&(position >> 1)) {
+                    let sibling_idx = position ^ 1;
+
+                    let columns = if let Some(&num_columns) =
+                        n_columns_per_log_size.get(&(max_log_size - 1 - i as u32))
+                    {
+                        let mut v = vec![];
+                        for _ in 0..num_columns {
+                            v.push(*value_iterator.next().unwrap());
+                        }
+                        v
+                    } else {
+                        vec![]
+                    };
+                    column_layer.insert(position >> 1, columns.clone());
+
+                    let hash = if let Some(sibling) = hash_layers[i].get(&sibling_idx) {
+                        let (left, right) = if position & 1 == 0 {
+                            (hash_layers[i].get(&position).unwrap(), sibling)
+                        } else {
+                            (sibling, hash_layers[i].get(&position).unwrap())
+                        };
+                        Poseidon31MerkleHasher::hash_node(Some((*left, *right)), &columns)
+                    } else {
+                        let sibling = hash_iterator.next().unwrap();
+                        hash_layers[i].insert(sibling_idx, *sibling);
+                        let (left, right) = if position & 1 == 0 {
+                            (hash_layers[i].get(&position).unwrap(), sibling)
+                        } else {
+                            (sibling, hash_layers[i].get(&position).unwrap())
+                        };
+                        Poseidon31MerkleHasher::hash_node(Some((*left, *right)), &columns)
+                    };
+
+                    layer.insert(position >> 1, hash);
+                    parents.insert(position >> 1);
+                }
+            }
+
+            column_layers.push(column_layer);
+            hash_layers.push(layer);
+            positions = parents.iter().copied().collect::<Vec<usize>>();
+        }
+
+        assert_eq!(hash_iterator.next(), None);
+        assert_eq!(value_iterator.next(), None);
+
+        // cheery-pick the Merkle tree paths to construct the deterministic proofs
+        let mut res = vec![];
+        for &query in queries.iter() {
+            let mut sibling_hashes = vec![];
+            let mut columns = BTreeMap::new();
+
+            let mut cur = query;
+            for layer in hash_layers.iter().take(max_log_size as usize) {
+                sibling_hashes.push(*layer.get(&(cur ^ 1)).unwrap());
+                cur >>= 1;
+            }
+
+            columns.insert(
+                max_log_size as usize,
+                queries_values_map.get(&query).unwrap().clone(),
+            );
+
+            let mut cur = query >> 1;
+            for (i, layer) in column_layers
+                .iter()
+                .take(max_log_size as usize - 1)
+                .enumerate()
+            {
+                columns.insert(
+                    max_log_size as usize - i - 1,
+                    layer.get(&cur).unwrap().clone(),
+                );
+                cur >>= 1;
+            }
+
+            res.push(StandaloneMerkleProof {
+                query,
+                sibling_hashes,
+                columns,
+                root: root.clone(),
+                depth: max_log_size as usize,
+            });
+        }
+        res
     }
 }
 
@@ -127,7 +218,7 @@ mod test {
             .keys()
             .max()
             .unwrap();
-        let _ = StandaloneMerkleProof::from_stwo_proof(
+        let proofs = StandaloneMerkleProof::from_stwo_proof(
             max_log_size,
             &fiat_shamir_hints
                 .query_positions_per_log_size
@@ -138,5 +229,8 @@ mod test {
             &fiat_shamir_hints.n_columns_per_log_size[0],
             &proof.stark_proof.decommitments[0],
         );
+        for proof in proofs.iter() {
+            proof.verify();
+        }
     }
 }
