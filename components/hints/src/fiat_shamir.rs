@@ -39,8 +39,12 @@ pub struct FiatShamirHints {
     pub all_log_sizes: BTreeSet<u32>,
     pub max_first_layer_column_log_size: u32,
     pub query_positions_per_log_size: BTreeMap<u32, Vec<usize>>,
+    pub raw_query_positions_per_log_size: BTreeMap<u32, Vec<usize>>,
     pub column_log_sizes: TreeVec<Vec<u32>>,
     pub n_columns_per_log_size: TreeVec<BTreeMap<u32, usize>>,
+    pub trees_log_sizes: TreeVec<Vec<u32>>,
+
+    pub log_blowup_factor: u32,
 
     pub plonk_tree_subspan: Vec<TreeSubspan>,
     pub poseidon_tree_subspan: Vec<TreeSubspan>,
@@ -51,6 +55,8 @@ pub struct FiatShamirHints {
     pub sample_points: TreeVec<ColumnVec<Vec<CirclePoint<SecureField>>>>,
     pub mask_plonk: TreeVec<Vec<Vec<isize>>>,
     pub mask_poseidon: TreeVec<Vec<Vec<isize>>>,
+
+    pub fri_verifier: FriVerifier<Poseidon31MerkleChannel>,
 }
 
 impl FiatShamirHints {
@@ -171,8 +177,8 @@ impl FiatShamirHints {
 
         assert!(channel.trailing_zeros() >= config.pow_bits);
 
-        // Get FRI query positions.
-        let query_positions_per_log_size = fri_verifier.sample_query_positions(channel);
+        let trees_log_sizes = proof.stmt0.log_sizes();
+
         let all_log_sizes = fri_verifier
             .first_layer
             .column_commitment_domains
@@ -180,6 +186,38 @@ impl FiatShamirHints {
             .map(|domain| domain.log_size())
             .collect::<BTreeSet<u32>>();
         let max_first_layer_column_log_size = *all_log_sizes.iter().max().unwrap();
+
+        // Get FRI query positions.
+        let raw_query_positions_per_log_size = {
+            let mut channel = channel.clone();
+            let mut raw_queries = vec![];
+
+            while raw_queries.len() < config.fri_config.n_queries {
+                let felts = channel.draw_felts(2);
+                raw_queries.extend_from_slice(&felts[0].to_m31_array());
+                raw_queries.extend_from_slice(&felts[1].to_m31_array());
+            }
+            raw_queries.truncate(config.fri_config.n_queries);
+
+            let mut queries = vec![];
+            for raw_query in raw_queries.iter() {
+                queries.push(raw_query.0 & ((1 << max_first_layer_column_log_size) - 1));
+            }
+
+            let mut map = BTreeMap::new();
+            for &log_size in all_log_sizes.iter() {
+                map.insert(
+                    log_size,
+                    queries
+                        .iter()
+                        .map(|x| (x >> (max_first_layer_column_log_size - log_size)) as usize)
+                        .collect_vec(),
+                );
+            }
+            map
+        };
+        let query_positions_per_log_size = fri_verifier.sample_query_positions(channel);
+
         let column_log_sizes = commitment_scheme
             .trees
             .as_ref()
@@ -208,9 +246,12 @@ impl FiatShamirHints {
 
             all_log_sizes,
             max_first_layer_column_log_size,
+            raw_query_positions_per_log_size,
             query_positions_per_log_size,
             column_log_sizes,
             n_columns_per_log_size,
+            trees_log_sizes,
+            log_blowup_factor: config.fri_config.log_blowup_factor,
 
             plonk_tree_subspan,
             poseidon_tree_subspan,
@@ -219,6 +260,7 @@ impl FiatShamirHints {
             sample_points,
             mask_plonk,
             mask_poseidon,
+            fri_verifier,
         }
     }
 }

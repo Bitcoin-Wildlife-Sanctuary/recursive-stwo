@@ -47,15 +47,29 @@ impl Poseidon31MerkleHasherVar {
         parent
     }
 
-    pub fn hash_tree_with_column_hash(
+    pub fn hash_tree_with_swap(
         left: &mut Poseidon2HalfStateRef,
         right: &mut Poseidon2HalfStateRef,
+        bit_value: bool,
+        bit_variable: usize,
+    ) -> Poseidon2HalfStateRef {
+        // assume that a witness must be used
+        assert!(left.addr_variable == 0 || right.addr_variable == 0);
+
+        Poseidon2HalfStateRef::swap_compress(left, right, bit_value, bit_variable)
+    }
+
+    pub fn hash_tree_with_column_hash_with_swap(
+        left: &mut Poseidon2HalfStateRef,
+        right: &mut Poseidon2HalfStateRef,
+        bit_value: bool,
+        bit_variable: usize,
         column_hash: &mut Poseidon2HalfStateRef,
     ) -> Poseidon2HalfStateRef {
         // assume that a witness must be used
         assert!(left.addr_variable == 0 || right.addr_variable == 0);
 
-        let (mut tree, _) = Poseidon2HalfStateRef::permute(left, right, false, true);
+        let mut tree = Poseidon2HalfStateRef::swap_compress(left, right, bit_value, bit_variable);
 
         let (parent, _) = Poseidon2HalfStateRef::permute(&mut tree, column_hash, false, true);
 

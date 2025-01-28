@@ -2,7 +2,7 @@ use circle_plonk_dsl_constraint_system::dvar::{AllocVar, AllocationMode, DVar};
 use circle_plonk_dsl_constraint_system::ConstraintSystemRef;
 use circle_plonk_dsl_fields::M31Var;
 use num_traits::{One, Zero};
-use std::ops::{Neg, Range};
+use std::ops::{Neg, Range, RangeFrom};
 use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::fields::qm31::QM31;
 
@@ -81,14 +81,6 @@ impl BitsVar {
         res
     }
 
-    pub fn subslice(&self, range: Range<usize>) -> BitsVar {
-        BitsVar {
-            cs: self.cs.clone(),
-            value: self.value[range.clone()].to_vec(),
-            variables: self.variables[range].to_vec(),
-        }
-    }
-
     pub fn get_value(&self) -> M31 {
         let mut sum_value = M31::zero();
 
@@ -123,6 +115,24 @@ impl BitsVar {
             cs,
             value: sum_value,
             variable: sum_variable,
+        }
+    }
+}
+
+impl BitsVar {
+    pub fn index_range(&self, range: Range<usize>) -> BitsVar {
+        BitsVar {
+            cs: self.cs.clone(),
+            value: self.value[range.clone()].to_vec(),
+            variables: self.variables[range].to_vec(),
+        }
+    }
+
+    pub fn index_range_from(&self, range: RangeFrom<usize>) -> BitsVar {
+        BitsVar {
+            cs: self.cs.clone(),
+            value: self.value[range.clone()].to_vec(),
+            variables: self.variables[range].to_vec(),
         }
     }
 }

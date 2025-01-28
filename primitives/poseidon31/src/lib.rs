@@ -2,7 +2,8 @@ use crate::implementation::poseidon2_permute;
 use circle_plonk_dsl_constraint_system::dvar::{AllocVar, AllocationMode, DVar};
 use circle_plonk_dsl_constraint_system::ConstraintSystemRef;
 use circle_plonk_dsl_fields::{M31Var, QM31Var};
-use num_traits::Zero;
+use num_traits::{One, Zero};
+use std::ops::Neg;
 use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::fields::qm31::QM31;
 use stwo_prover::examples::plonk_with_poseidon::poseidon::PoseidonEntry;
@@ -85,7 +86,8 @@ impl Poseidon2HalfStateRef {
     pub fn swap_compress(
         a0: &Poseidon2HalfStateRef,
         a1: &Poseidon2HalfStateRef,
-        bit: &M31Var,
+        bit_value: bool,
+        bit_variable: usize,
     ) -> Poseidon2HalfStateRef {
         if a0.addr_variable == 0 {
             assert!(!a0.disabled);
@@ -94,30 +96,25 @@ impl Poseidon2HalfStateRef {
             assert!(!a1.disabled);
         }
 
-        let cs = a0.cs.and(&a1.cs).and(&bit.cs);
-        let bit_neg = &M31Var::one(&cs) - bit;
+        let cs = a0.cs.and(&a1.cs);
+        let mut bit_variable_neg = cs.mul_constant(bit_variable, M31::one().neg());
+        bit_variable_neg = cs.add(1, bit_variable_neg);
 
-        let a0_addr = M31Var {
-            cs: cs.clone(),
-            value: M31::from(a0.half_state_variable),
-            variable: a0.addr_variable,
-        };
-        let a1_addr = M31Var {
-            cs: cs.clone(),
-            value: M31::from(a1.half_state_variable),
-            variable: a1.addr_variable,
-        };
+        let t0 = cs.mul(a0.addr_variable, bit_variable_neg);
+        let t1 = cs.mul(a1.addr_variable, bit_variable);
+        let new_a0_addr_variable = cs.add(t0, t1);
 
-        let new_a0_addr = &(&a0_addr * &bit_neg) + &(&a1_addr * bit);
-        let new_a1_addr = &(&a0_addr + &a1_addr) - &new_a0_addr;
+        let t0 = cs.add(a0.addr_variable, a1.addr_variable);
+        let t1 = cs.mul_constant(new_a0_addr_variable, M31::one().neg());
+        let new_a1_addr_variable = cs.add(t0, t1);
 
-        let (mut left, mut right) = if bit.value.is_zero() {
+        let (mut left, mut right) = if !bit_value {
             (a0.clone(), a1.clone())
         } else {
             (a1.clone(), a0.clone())
         };
-        left.addr_variable = new_a0_addr.variable;
-        right.addr_variable = new_a1_addr.variable;
+        left.addr_variable = new_a0_addr_variable;
+        right.addr_variable = new_a1_addr_variable;
 
         let (digest, _) = Self::permute(&mut left, &mut right, false, true);
         digest

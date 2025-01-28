@@ -4,24 +4,31 @@ use crate::data_structures::{
 };
 use circle_plonk_dsl_bits::BitsVar;
 use circle_plonk_dsl_circle::{CirclePointM31Var, CirclePointQM31Var};
-use circle_plonk_dsl_constraint_system::dvar::{AllocVar, DVar};
-use circle_plonk_dsl_data_structures::PlonkWithPoseidonProofVar;
+use circle_plonk_dsl_constraint_system::dvar::DVar;
+use circle_plonk_dsl_constraint_system::ConstraintSystemRef;
+use circle_plonk_dsl_data_structures::{DecommitmentVar, PlonkWithPoseidonProofVar};
 use circle_plonk_dsl_fiat_shamir::FiatShamirResults;
 use circle_plonk_dsl_fields::{M31Var, QM31Var};
-use circle_plonk_dsl_hints::{AnswerHints, FiatShamirHints};
+use circle_plonk_dsl_hints::{AnswerHints, DecommitHints, FiatShamirHints};
 use itertools::{izip, multiunzip, Itertools};
 use std::cmp::Reverse;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::iter::zip;
 use std::ops::Add;
 use stwo_prover::constraint_framework::PREPROCESSED_TRACE_IDX;
+use stwo_prover::core::backend::Col;
 use stwo_prover::core::pcs::TreeVec;
 use stwo_prover::core::poly::circle::CanonicCoset;
 use stwo_prover::core::ColumnVec;
 
 pub mod data_structures;
 
-pub struct FRIAnswerResults;
+pub struct FRIAnswerResults {
+    pub cs: ConstraintSystemRef,
+    pub query_positions_per_log_size: BTreeMap<u32, Vec<BitsVar>>,
+    pub fri_answers: ColumnVec<Vec<QM31Var>>,
+    pub domain_points: ColumnVec<Vec<CirclePointM31Var>>,
+}
 
 impl FRIAnswerResults {
     pub fn compute(
@@ -29,8 +36,9 @@ impl FRIAnswerResults {
         fiat_shamir_hints: &FiatShamirHints,
         fiat_shamir_results: &FiatShamirResults,
         fri_answer_hints: &AnswerHints,
+        decommit_hints: &DecommitHints,
         proof: &PlonkWithPoseidonProofVar,
-    ) {
+    ) -> FRIAnswerResults {
         let cs = oods_point.cs();
 
         let mut all_shifts_plonk = HashSet::new();
@@ -167,7 +175,7 @@ impl FRIAnswerResults {
         let queries_log_domain_size = fiat_shamir_hints.max_first_layer_column_log_size;
         for raw_query in fiat_shamir_results.raw_queries.iter() {
             raw_queries_bits.push(
-                BitsVar::from_m31(raw_query, 31).subslice(0..queries_log_domain_size as usize),
+                BitsVar::from_m31(raw_query, 31).index_range(0..queries_log_domain_size as usize),
             );
         }
 
@@ -177,12 +185,7 @@ impl FRIAnswerResults {
                 log_size,
                 raw_queries_bits
                     .iter()
-                    .map(|v| {
-                        v.subslice(
-                            (queries_log_domain_size - log_size) as usize
-                                ..queries_log_domain_size as usize,
-                        )
-                    })
+                    .map(|v| v.index_range_from((queries_log_domain_size - log_size) as usize..))
                     .collect_vec(),
             );
         }
@@ -206,41 +209,117 @@ impl FRIAnswerResults {
                 fiat_shamir_hints.query_positions_per_log_size[&column_log_size]
             );
         }
+        for (column_log_size, queries) in query_positions_per_log_size.iter() {
+            let mut unsorted_queries = vec![];
+            for query in queries {
+                unsorted_queries.push(query.get_value().0 as usize);
+            }
+
+            assert_eq!(
+                unsorted_queries,
+                fiat_shamir_hints.raw_query_positions_per_log_size[&column_log_size]
+            );
+        }
+
+        let mut decommitment_var = DecommitmentVar::new_single_use(&cs, &decommit_hints);
+        for (i, query) in query_positions_per_log_size[&(*fiat_shamir_hints.trees_log_sizes[0]
+            .iter()
+            .max()
+            .unwrap()
+            + fiat_shamir_hints.log_blowup_factor)]
+            .iter()
+            .enumerate()
+        {
+            decommitment_var.precomputed_proofs[i]
+                .verify(&fiat_shamir_results.preprocessed_commitment, query);
+        }
+        for (i, query) in query_positions_per_log_size[&(*fiat_shamir_hints.trees_log_sizes[1]
+            .iter()
+            .max()
+            .unwrap()
+            + fiat_shamir_hints.log_blowup_factor)]
+            .iter()
+            .enumerate()
+        {
+            decommitment_var.trace_proofs[i].verify(&fiat_shamir_results.trace_commitment, query);
+        }
+        for (i, query) in query_positions_per_log_size[&(*fiat_shamir_hints.trees_log_sizes[2]
+            .iter()
+            .max()
+            .unwrap()
+            + fiat_shamir_hints.log_blowup_factor)]
+            .iter()
+            .enumerate()
+        {
+            decommitment_var.interaction_proofs[i]
+                .verify(&fiat_shamir_results.interaction_trace_commitment, query);
+        }
+        for (i, query) in query_positions_per_log_size
+            [&fiat_shamir_hints.max_first_layer_column_log_size]
+            .iter()
+            .enumerate()
+        {
+            decommitment_var.composition_proofs[i]
+                .verify(&fiat_shamir_results.composition_commitment, query);
+        }
 
         let mut queried_values = BTreeMap::new();
         for &log_size in fiat_shamir_hints.all_log_sizes.iter() {
             let mut queried_values_this_log_size = Vec::new();
-            for query in query_positions_per_log_size[&log_size].iter() {
-                let query = query.get_value().0;
-                let values = &fri_answer_hints.sampled_values.0[&log_size].0[&query];
-                queried_values_this_log_size.push(
-                    values
-                        .iter()
-                        .map(|value| M31Var::new_witness(&cs, value))
-                        .collect_vec(),
+            for (i, _) in query_positions_per_log_size[&log_size].iter().enumerate() {
+                let mut v = vec![];
+                v.extend_from_slice(
+                    &decommitment_var.precomputed_proofs[i]
+                        .columns
+                        .get(&(log_size as usize))
+                        .unwrap_or(&vec![]),
                 );
+                v.extend_from_slice(
+                    &decommitment_var.trace_proofs[i]
+                        .columns
+                        .get(&(log_size as usize))
+                        .unwrap_or(&vec![]),
+                );
+                v.extend_from_slice(
+                    &decommitment_var.interaction_proofs[i]
+                        .columns
+                        .get(&(log_size as usize))
+                        .unwrap_or(&vec![]),
+                );
+                v.extend_from_slice(
+                    &decommitment_var.composition_proofs[i]
+                        .columns
+                        .get(&(log_size as usize))
+                        .unwrap_or(&vec![]),
+                );
+                queried_values_this_log_size.push(v);
             }
             queried_values.insert(log_size, queried_values_this_log_size);
         }
 
-        let fri_answers: ColumnVec<Vec<QM31Var>> = izip!(
+        let mut fri_answers = ColumnVec::<Vec<QM31Var>>::new();
+        let mut domain_points = ColumnVec::<Vec<CirclePointM31Var>>::new();
+
+        izip!(
             fiat_shamir_hints.column_log_sizes.clone().flatten(),
             samples.flatten().iter()
         )
         .sorted_by_key(|(log_size, ..)| Reverse(*log_size))
         .chunk_by(|(log_size, ..)| *log_size)
         .into_iter()
-        .map(|(log_size, tuples)| {
+        .for_each(|(log_size, tuples)| {
             let (_, samples): (Vec<_>, Vec<_>) = multiunzip(tuples);
-            Self::fri_answers_for_log_size(
-                log_size,
-                &samples,
-                &fiat_shamir_results.after_sampled_values_random_coeff,
-                &query_positions_per_log_size[&log_size],
-                &queried_values[&log_size],
-            )
-        })
-        .collect();
+            let (domain_points_per_log_size, fri_answers_per_log_size) =
+                Self::fri_answers_for_log_size(
+                    log_size,
+                    &samples,
+                    &fiat_shamir_results.after_sampled_values_random_coeff,
+                    &query_positions_per_log_size[&log_size],
+                    &queried_values[&log_size],
+                );
+            domain_points.push(domain_points_per_log_size);
+            fri_answers.push(fri_answers_per_log_size);
+        });
 
         let mut log_sizes = fiat_shamir_hints
             .all_log_sizes
@@ -269,6 +348,13 @@ impl FRIAnswerResults {
                 assert_eq!(*map.get(&(k.get_value().0 as usize)).unwrap(), v.value);
             }
         }
+
+        Self {
+            cs,
+            query_positions_per_log_size,
+            fri_answers,
+            domain_points,
+        }
     }
 
     pub fn fri_answers_for_log_size(
@@ -277,12 +363,13 @@ impl FRIAnswerResults {
         random_coeff: &QM31Var,
         query_positions: &[BitsVar],
         queried_values: &[Vec<M31Var>],
-    ) -> Vec<QM31Var> {
+    ) -> (Vec<CirclePointM31Var>, Vec<QM31Var>) {
         let sample_batches = ColumnSampleBatchVar::new_vec(samples);
         // TODO(ilya): Is it ok to use the same `random_coeff` for all log sizes.
         let quotient_constants = quotient_constants_var(&sample_batches, random_coeff);
         let commitment_domain = CanonicCoset::new(log_size).circle_domain();
 
+        let mut domain_points_at_queries = Vec::new();
         let mut quotient_evals_at_queries = Vec::new();
         for (query_position, queried_values_at_row) in
             query_positions.iter().zip(queried_values.iter())
@@ -295,9 +382,10 @@ impl FRIAnswerResults {
                 &quotient_constants,
                 &domain_point,
             ));
+            domain_points_at_queries.push(domain_point);
         }
 
-        quotient_evals_at_queries
+        (domain_points_at_queries, quotient_evals_at_queries)
     }
 }
 
@@ -309,7 +397,7 @@ mod test {
     use circle_plonk_dsl_constraint_system::ConstraintSystemRef;
     use circle_plonk_dsl_data_structures::PlonkWithPoseidonProofVar;
     use circle_plonk_dsl_fiat_shamir::FiatShamirResults;
-    use circle_plonk_dsl_hints::{AnswerHints, FiatShamirHints};
+    use circle_plonk_dsl_hints::{AnswerHints, DecommitHints, FiatShamirHints};
     use num_traits::One;
     use stwo_prover::core::fields::qm31::QM31;
     use stwo_prover::core::fri::FriConfig;
@@ -337,12 +425,14 @@ mod test {
 
         let fiat_shamir_results = FiatShamirResults::compute(&fiat_shamir_hints, &mut proof_var);
         let fri_answer_hints = AnswerHints::compute(&fiat_shamir_hints, &proof);
+        let decommitment_hints = DecommitHints::compute(&fiat_shamir_hints, &proof);
 
         FRIAnswerResults::compute(
             &CirclePointQM31Var::new_witness(&cs, &fiat_shamir_hints.oods_point),
             &fiat_shamir_hints,
             &fiat_shamir_results,
             &fri_answer_hints,
+            &decommitment_hints,
             &proof_var,
         );
 

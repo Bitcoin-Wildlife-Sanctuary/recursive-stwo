@@ -1,4 +1,4 @@
-use crate::{AnswerHints, FiatShamirHints};
+use crate::FiatShamirHints;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use stwo_prover::core::fields::m31::{BaseField, M31};
 use stwo_prover::core::vcs::ops::MerkleHasher;
@@ -8,7 +8,7 @@ use stwo_prover::core::vcs::prover::MerkleDecommitment;
 use stwo_prover::examples::plonk_with_poseidon::air::PlonkWithPoseidonProof;
 
 #[derive(Clone, Debug)]
-pub struct StandaloneMerkleProof {
+pub struct SinglePathMerkleProof {
     pub query: usize,
 
     pub sibling_hashes: Vec<Poseidon31Hash>,
@@ -18,7 +18,7 @@ pub struct StandaloneMerkleProof {
     pub depth: usize,
 }
 
-impl StandaloneMerkleProof {
+impl SinglePathMerkleProof {
     pub fn verify(&self) {
         let mut cur_hash = Poseidon31MerkleHasher::hash_node(
             None,
@@ -43,14 +43,14 @@ impl StandaloneMerkleProof {
 
     pub fn from_stwo_proof(
         max_log_size: u32,
-        queries: &[usize],
+        raw_queries: &[usize],
         values: &[BaseField],
         root: Poseidon31Hash,
         n_columns_per_log_size: &BTreeMap<u32, usize>,
         merkle_decommitment: &MerkleDecommitment<Poseidon31MerkleHasher>,
-    ) -> Vec<StandaloneMerkleProof> {
+    ) -> Vec<SinglePathMerkleProof> {
         // find out all the queried positions and sort them
-        let mut queries = queries.to_vec();
+        let mut queries = raw_queries.to_vec();
         queries.sort_unstable();
         queries.dedup();
 
@@ -143,7 +143,7 @@ impl StandaloneMerkleProof {
 
         // cheery-pick the Merkle tree paths to construct the deterministic proofs
         let mut res = vec![];
-        for &query in queries.iter() {
+        for &query in raw_queries.iter() {
             let mut sibling_hashes = vec![];
             let mut columns = BTreeMap::new();
 
@@ -164,14 +164,14 @@ impl StandaloneMerkleProof {
                 .take(max_log_size as usize - 1)
                 .enumerate()
             {
-                columns.insert(
-                    max_log_size as usize - i - 1,
-                    layer.get(&cur).unwrap().clone(),
-                );
+                let data = layer.get(&cur).unwrap().clone();
+                if !data.is_empty() {
+                    columns.insert(max_log_size as usize - i - 1, data);
+                }
                 cur >>= 1;
             }
 
-            res.push(StandaloneMerkleProof {
+            res.push(SinglePathMerkleProof {
                 query,
                 sibling_hashes,
                 columns,
@@ -183,54 +183,94 @@ impl StandaloneMerkleProof {
     }
 }
 
-pub struct DecommitHints;
+#[derive(Debug, Clone)]
+pub struct DecommitHints {
+    pub precomputed_proofs: Vec<SinglePathMerkleProof>,
+    pub trace_proofs: Vec<SinglePathMerkleProof>,
+    pub interaction_proofs: Vec<SinglePathMerkleProof>,
+    pub composition_proofs: Vec<SinglePathMerkleProof>,
+}
 
 impl DecommitHints {
     pub fn compute(
-        _fiat_shamir_hints: &FiatShamirHints,
-        _answer_hints: &AnswerHints,
-        _proof: &PlonkWithPoseidonProof<Poseidon31MerkleHasher>,
+        fiat_shamir_hints: &FiatShamirHints,
+        proof: &PlonkWithPoseidonProof<Poseidon31MerkleHasher>,
     ) -> Self {
-        DecommitHints {}
+        let mut precomputed_proofs = vec![];
+        let mut trace_proofs = vec![];
+        let mut interaction_proofs = vec![];
+        let mut composition_proofs = vec![];
+
+        for (i, v) in [
+            &mut precomputed_proofs,
+            &mut trace_proofs,
+            &mut interaction_proofs,
+            &mut composition_proofs,
+        ]
+        .iter_mut()
+        .enumerate()
+        {
+            let max_log_size = *fiat_shamir_hints.n_columns_per_log_size[i]
+                .keys()
+                .max()
+                .unwrap();
+
+            **v = SinglePathMerkleProof::from_stwo_proof(
+                max_log_size,
+                &fiat_shamir_hints
+                    .raw_query_positions_per_log_size
+                    .get(&max_log_size)
+                    .unwrap(),
+                &proof.stark_proof.queried_values[i],
+                proof.stark_proof.commitments[i],
+                &fiat_shamir_hints.n_columns_per_log_size[i],
+                &proof.stark_proof.decommitments[i],
+            );
+
+            for proof in v.iter() {
+                proof.verify();
+            }
+        }
+
+        DecommitHints {
+            precomputed_proofs,
+            trace_proofs,
+            interaction_proofs,
+            composition_proofs,
+        }
     }
 }
 
 #[cfg(test)]
 mod test {
-    use crate::{FiatShamirHints, StandaloneMerkleProof};
+    use crate::{DecommitHints, FiatShamirHints};
+    use num_traits::One;
+    use stwo_prover::core::fields::qm31::QM31;
     use stwo_prover::core::fri::FriConfig;
     use stwo_prover::core::pcs::PcsConfig;
-    use stwo_prover::core::vcs::poseidon31_merkle::Poseidon31MerkleHasher;
-    use stwo_prover::examples::plonk_with_poseidon::air::PlonkWithPoseidonProof;
+    use stwo_prover::core::vcs::poseidon31_merkle::{
+        Poseidon31MerkleChannel, Poseidon31MerkleHasher,
+    };
+    use stwo_prover::examples::plonk_with_poseidon::air::{
+        verify_plonk_with_poseidon, PlonkWithPoseidonProof,
+    };
 
     #[test]
-    fn test_merkle_tree_proof_conversion() {
+    fn test_decommitment() {
         let proof: PlonkWithPoseidonProof<Poseidon31MerkleHasher> =
             bincode::deserialize(include_bytes!("../../test_data/joint_proof.bin")).unwrap();
         let config = PcsConfig {
             pow_bits: 20,
             fri_config: FriConfig::new(0, 5, 16),
         };
+        verify_plonk_with_poseidon::<Poseidon31MerkleChannel>(
+            proof.clone(),
+            config,
+            &[(1, QM31::one())],
+        )
+        .unwrap();
 
         let fiat_shamir_hints = FiatShamirHints::new(&proof, config);
-
-        let max_log_size = *fiat_shamir_hints.n_columns_per_log_size[0]
-            .keys()
-            .max()
-            .unwrap();
-        let proofs = StandaloneMerkleProof::from_stwo_proof(
-            max_log_size,
-            &fiat_shamir_hints
-                .query_positions_per_log_size
-                .get(&max_log_size)
-                .unwrap(),
-            &proof.stark_proof.queried_values[0],
-            proof.stark_proof.commitments[0],
-            &fiat_shamir_hints.n_columns_per_log_size[0],
-            &proof.stark_proof.decommitments[0],
-        );
-        for proof in proofs.iter() {
-            proof.verify();
-        }
+        let _ = DecommitHints::compute(&fiat_shamir_hints, &proof);
     }
 }
