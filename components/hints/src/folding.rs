@@ -1,19 +1,22 @@
 use crate::{AnswerHints, FiatShamirHints};
 use itertools::{zip_eq, Itertools};
 use num_traits::Zero;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::fields::qm31::SecureField;
 use stwo_prover::core::fields::secure_column::SECURE_EXTENSION_DEGREE;
 use stwo_prover::core::fri::SparseEvaluation;
+use stwo_prover::core::poly::circle::CircleDomain;
 use stwo_prover::core::utils::bit_reverse_index;
 use stwo_prover::core::vcs::ops::MerkleHasher;
 use stwo_prover::core::vcs::poseidon31_hash::Poseidon31Hash;
 use stwo_prover::core::vcs::poseidon31_merkle::Poseidon31MerkleHasher;
 use stwo_prover::core::vcs::poseidon31_ref::Poseidon31CRH;
+use stwo_prover::core::vcs::prover::MerkleDecommitment;
 use stwo_prover::core::vcs::verifier::MerkleVerifier;
 use stwo_prover::examples::plonk_with_poseidon::air::PlonkWithPoseidonProof;
 
+#[derive(Clone)]
 pub struct SinglePairMerkleProofs {
     pub query: usize,
 
@@ -48,7 +51,10 @@ impl SinglePairMerkleProofs {
                     },
                     &vec![],
                 );
-                sibling_hash = self.sibling_hashes[i];
+                println!("{:?}", self_hash);
+                if i != self.depth - 1 {
+                    sibling_hash = self.sibling_hashes[i];
+                }
             } else {
                 self_hash = Poseidon31MerkleHasher::hash_node(
                     if (self.query >> i) & 1 == 0 {
@@ -71,11 +77,210 @@ impl SinglePairMerkleProofs {
         }
         assert_eq!(self_hash, self.root);
     }
+
+    pub fn from_stwo_proof(
+        column_domains: &[CircleDomain],
+        root: Poseidon31Hash,
+        leaf_queries: &[usize],
+        values: &[M31],
+        decommitment: &MerkleDecommitment<Poseidon31MerkleHasher>,
+    ) -> Vec<SinglePairMerkleProofs> {
+        // log_sizes with data
+        let mut log_sizes_with_data = BTreeSet::new();
+        for column_domain in column_domains.iter() {
+            log_sizes_with_data.insert(column_domain.log_size());
+        }
+
+        // require the column witness to be empty
+        // (all the values are provided)
+        assert_eq!(decommitment.column_witness.len(), 0);
+
+        // get the max log_size
+        let max_log_size = *log_sizes_with_data.iter().max().unwrap();
+
+        let mut queries = leaf_queries.to_vec();
+
+        // values iter
+        let mut values_iter = values.iter();
+        let mut hash_iter = decommitment.hash_witness.iter();
+
+        let mut queries_values_map = BTreeMap::new();
+        let mut hash_layers: Vec<HashMap<usize, Poseidon31Hash>> = vec![];
+
+        for current_log_size in (0..=max_log_size).rev() {
+            queries.sort_unstable();
+            queries.dedup();
+
+            if log_sizes_with_data.contains(&current_log_size) {
+                // compute the query positions and their siblings
+                let mut self_and_siblings = vec![];
+                for &q in queries.iter() {
+                    self_and_siblings.push(q);
+                    self_and_siblings.push(q ^ 1);
+                }
+                self_and_siblings.sort_unstable();
+                self_and_siblings.dedup();
+
+                let mut queries_values = BTreeMap::new();
+                for k in self_and_siblings.iter() {
+                    let v = [
+                        *values_iter.next().unwrap(),
+                        *values_iter.next().unwrap(),
+                        *values_iter.next().unwrap(),
+                        *values_iter.next().unwrap(),
+                    ];
+                    queries_values.insert(*k, v);
+                }
+
+                let mut hash_layer = HashMap::new();
+                for (&query, value) in queries_values.iter() {
+                    if current_log_size == max_log_size {
+                        hash_layer.insert(query, Poseidon31MerkleHasher::hash_node(None, value));
+                    } else {
+                        let left_idx = query << 1;
+                        let right_idx = left_idx + 1;
+
+                        let left_hash =
+                            if let Some(hash) = hash_layers.last().unwrap().get(&left_idx) {
+                                *hash
+                            } else {
+                                let v = *hash_iter.next().unwrap();
+                                hash_layers.last_mut().unwrap().insert(left_idx, v);
+                                v
+                            };
+                        let right_hash =
+                            if let Some(hash) = hash_layers.last().unwrap().get(&right_idx) {
+                                *hash
+                            } else {
+                                let v = *hash_iter.next().unwrap();
+                                hash_layers.last_mut().unwrap().insert(right_idx, v);
+                                v
+                            };
+                        hash_layer.insert(
+                            query,
+                            Poseidon31MerkleHasher::hash_node(Some((left_hash, right_hash)), value),
+                        );
+                    }
+                }
+
+                queries_values_map.insert(current_log_size, queries_values);
+                hash_layers.push(hash_layer);
+            } else {
+                assert_ne!(current_log_size, max_log_size);
+
+                let mut hash_layer = HashMap::new();
+                for &query in queries.iter() {
+                    let left_idx = query << 1;
+                    let right_idx = left_idx + 1;
+
+                    let left_hash = if let Some(hash) = hash_layers.last().unwrap().get(&left_idx) {
+                        *hash
+                    } else {
+                        let v = *hash_iter.next().unwrap();
+                        hash_layers.last_mut().unwrap().insert(left_idx, v);
+                        v
+                    };
+                    let right_hash = if let Some(hash) = hash_layers.last().unwrap().get(&right_idx)
+                    {
+                        *hash
+                    } else {
+                        let v = *hash_iter.next().unwrap();
+                        hash_layers.last_mut().unwrap().insert(right_idx, v);
+                        v
+                    };
+
+                    let h = Poseidon31MerkleHasher::hash_node(Some((left_hash, right_hash)), &[]);
+                    hash_layer.insert(query, h);
+                }
+
+                hash_layers.push(hash_layer);
+            }
+
+            queries.iter_mut().for_each(|v| *v = (*v) >> 1);
+        }
+
+        assert!(values_iter.next().is_none());
+        assert!(hash_iter.next().is_none());
+
+        assert_eq!(hash_layers.last().unwrap().len(), 1);
+        assert_eq!(*hash_layers.last().unwrap().get(&0).unwrap(), root);
+
+        let mut proofs = vec![];
+        for leaf_query in leaf_queries.iter() {
+            let mut sibling_hashes = vec![];
+            let mut self_columns = BTreeMap::new();
+            let mut siblings_columns = BTreeMap::new();
+
+            let mut query = *leaf_query;
+
+            for current_log_size in (1..=max_log_size).rev() {
+                if log_sizes_with_data.contains(&current_log_size) {
+                    let self_idx = query;
+                    let sibling_idx = self_idx ^ 1;
+
+                    let self_value = queries_values_map
+                        .get(&current_log_size)
+                        .unwrap()
+                        .get(&self_idx)
+                        .unwrap();
+                    let sibling_value = queries_values_map
+                        .get(&current_log_size)
+                        .unwrap()
+                        .get(&sibling_idx)
+                        .unwrap();
+
+                    self_columns.insert(current_log_size as usize, self_value.to_vec());
+                    siblings_columns.insert(current_log_size as usize, sibling_value.to_vec());
+
+                    if current_log_size != max_log_size {
+                        let sibling_left = sibling_idx << 1;
+                        let sibling_right = sibling_left + 1;
+
+                        let left_hash = *hash_layers
+                            [(max_log_size - current_log_size - 1) as usize]
+                            .get(&sibling_left)
+                            .unwrap();
+                        let right_hash = *hash_layers
+                            [(max_log_size - current_log_size - 1) as usize]
+                            .get(&sibling_right)
+                            .unwrap();
+
+                        sibling_hashes.push(Poseidon31MerkleHasher::hash_node(
+                            Some((left_hash, right_hash)),
+                            &[],
+                        ));
+                    }
+                } else {
+                    let self_idx = query;
+                    let sibling_idx = self_idx ^ 1;
+
+                    let sibling_hash = *hash_layers[(max_log_size - current_log_size) as usize]
+                        .get(&sibling_idx)
+                        .unwrap();
+                    sibling_hashes.push(sibling_hash);
+                }
+                query >>= 1;
+            }
+
+            let proof = SinglePairMerkleProofs {
+                query: *leaf_query,
+                sibling_hashes,
+                self_columns,
+                siblings_columns,
+                root,
+                depth: max_log_size as usize,
+            };
+            proof.verify();
+            proofs.push(proof);
+        }
+        proofs
+    }
 }
 
 #[derive(Clone)]
 pub struct FirstLayerHints {
     pub siblings: BTreeMap<u32, BTreeMap<usize, SecureField>>,
+    pub merkle_proofs: Vec<SinglePairMerkleProofs>,
 }
 
 impl FirstLayerHints {
@@ -152,26 +357,33 @@ impl FirstLayerHints {
                 .flat_map(|column_domain| [column_domain.log_size(); SECURE_EXTENSION_DEGREE])
                 .collect(),
         );
-        println!(
-            "{:?}",
-            fiat_shamir_hints
-                .fri_verifier
-                .first_layer
-                .column_commitment_domains
-                .iter()
-                .flat_map(|column_domain| [column_domain.log_size(); SECURE_EXTENSION_DEGREE])
-                .collect_vec()
-        );
 
         merkle_verifier
             .verify(
                 &decommitment_positions_by_log_size,
-                decommitmented_values,
+                decommitmented_values.clone(),
                 proof.stark_proof.fri_proof.first_layer.decommitment.clone(),
             )
             .unwrap();
 
-        FirstLayerHints { siblings }
+        let merkle_proofs = SinglePairMerkleProofs::from_stwo_proof(
+            &fiat_shamir_hints
+                .fri_verifier
+                .first_layer
+                .column_commitment_domains,
+            proof.stark_proof.fri_proof.first_layer.commitment,
+            &fiat_shamir_hints
+                .query_positions_per_log_size
+                .get(&fiat_shamir_hints.max_first_layer_column_log_size)
+                .unwrap(),
+            &decommitmented_values,
+            &proof.stark_proof.fri_proof.first_layer.decommitment,
+        );
+
+        FirstLayerHints {
+            siblings,
+            merkle_proofs,
+        }
     }
 
     pub fn compute_decommitment_positions_and_rebuild_evals(
@@ -249,6 +461,9 @@ mod test {
 
         let fiat_shamir_hints = FiatShamirHints::new(&proof, config);
         let answer_hints = AnswerHints::compute(&fiat_shamir_hints, &proof);
-        FirstLayerHints::compute(&fiat_shamir_hints, &answer_hints, &proof);
+        let first_layer_hints = FirstLayerHints::compute(&fiat_shamir_hints, &answer_hints, &proof);
+        for proof in first_layer_hints.merkle_proofs.iter() {
+            proof.verify();
+        }
     }
 }
