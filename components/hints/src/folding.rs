@@ -17,7 +17,7 @@ use stwo_prover::core::vcs::verifier::MerkleVerifier;
 use stwo_prover::examples::plonk_with_poseidon::air::PlonkWithPoseidonProof;
 
 #[derive(Clone)]
-pub struct SinglePairMerkleProofs {
+pub struct SinglePairMerkleProof {
     pub query: usize,
 
     pub sibling_hashes: Vec<Poseidon31Hash>,
@@ -28,7 +28,7 @@ pub struct SinglePairMerkleProofs {
     pub depth: usize,
 }
 
-impl SinglePairMerkleProofs {
+impl SinglePairMerkleProof {
     pub fn verify(&self) {
         let mut self_hash = Poseidon31MerkleHasher::hash_node(
             None,
@@ -42,7 +42,7 @@ impl SinglePairMerkleProofs {
         for i in 0..self.depth {
             let h = self.depth - i - 1;
 
-            if self.self_columns.get(&h).is_none() {
+            if !self.self_columns.contains_key(&h) {
                 self_hash = Poseidon31MerkleHasher::hash_node(
                     if (self.query >> i) & 1 == 0 {
                         Some((self_hash, sibling_hash))
@@ -51,7 +51,6 @@ impl SinglePairMerkleProofs {
                     },
                     &vec![],
                 );
-                println!("{:?}", self_hash);
                 if i != self.depth - 1 {
                     sibling_hash = self.sibling_hashes[i];
                 }
@@ -84,7 +83,7 @@ impl SinglePairMerkleProofs {
         leaf_queries: &[usize],
         values: &[M31],
         decommitment: &MerkleDecommitment<Poseidon31MerkleHasher>,
-    ) -> Vec<SinglePairMerkleProofs> {
+    ) -> Vec<SinglePairMerkleProof> {
         // log_sizes with data
         let mut log_sizes_with_data = BTreeSet::new();
         for column_domain in column_domains.iter() {
@@ -262,7 +261,7 @@ impl SinglePairMerkleProofs {
                 query >>= 1;
             }
 
-            let proof = SinglePairMerkleProofs {
+            let proof = SinglePairMerkleProof {
                 query: *leaf_query,
                 sibling_hashes,
                 self_columns,
@@ -280,7 +279,7 @@ impl SinglePairMerkleProofs {
 #[derive(Clone)]
 pub struct FirstLayerHints {
     pub siblings: BTreeMap<u32, BTreeMap<usize, SecureField>>,
-    pub merkle_proofs: Vec<SinglePairMerkleProofs>,
+    pub merkle_proofs: Vec<SinglePairMerkleProof>,
 }
 
 impl FirstLayerHints {
@@ -366,7 +365,7 @@ impl FirstLayerHints {
             )
             .unwrap();
 
-        let merkle_proofs = SinglePairMerkleProofs::from_stwo_proof(
+        let merkle_proofs = SinglePairMerkleProof::from_stwo_proof(
             &fiat_shamir_hints
                 .fri_verifier
                 .first_layer

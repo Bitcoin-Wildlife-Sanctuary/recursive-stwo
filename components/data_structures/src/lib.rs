@@ -3,7 +3,7 @@ use circle_plonk_dsl_channel::{ChannelVar, HashVar};
 use circle_plonk_dsl_constraint_system::dvar::{AllocVar, AllocationMode, DVar};
 use circle_plonk_dsl_constraint_system::ConstraintSystemRef;
 use circle_plonk_dsl_fields::{M31Var, QM31Var};
-use circle_plonk_dsl_hints::{DecommitHints, SinglePathMerkleProof};
+use circle_plonk_dsl_hints::{DecommitHints, SinglePairMerkleProof, SinglePathMerkleProof};
 use circle_plonk_dsl_merkle::Poseidon31MerkleHasherVar;
 use num_traits::One;
 use std::collections::BTreeMap;
@@ -353,6 +353,119 @@ impl SinglePathMerkleProofVar {
     }
 }
 
+#[derive(Clone)]
+pub struct SinglePairMerkleProofVar {
+    pub cs: ConstraintSystemRef,
+    pub value: SinglePairMerkleProof,
+    pub sibling_hashes: Vec<HashVar>,
+    pub self_columns: BTreeMap<usize, Vec<M31Var>>,
+    pub siblings_columns: BTreeMap<usize, Vec<M31Var>>,
+}
+
+impl DVar for SinglePairMerkleProofVar {
+    type Value = SinglePairMerkleProof;
+
+    fn cs(&self) -> ConstraintSystemRef {
+        self.cs.clone()
+    }
+}
+
+impl SinglePairMerkleProofVar {
+    pub fn new_single_use_merkle_proof(
+        cs: &ConstraintSystemRef,
+        value: &SinglePairMerkleProof,
+    ) -> Self {
+        let mut sibling_hashes = vec![];
+        for sibling_hash in value.sibling_hashes.iter() {
+            sibling_hashes.push(HashVar::new_single_use_witness(&cs, &sibling_hash.0));
+        }
+
+        let mut self_columns = BTreeMap::new();
+        for (k, v) in value.self_columns.iter() {
+            let mut v_var = vec![];
+            for vv in v.iter() {
+                v_var.push(M31Var::new_witness(&cs, &vv));
+            }
+            self_columns.insert(*k, v_var);
+        }
+
+        let mut siblings_columns = BTreeMap::new();
+        for (k, v) in value.siblings_columns.iter() {
+            let mut v_var = vec![];
+            for vv in v.iter() {
+                v_var.push(M31Var::new_witness(&cs, &vv));
+            }
+            siblings_columns.insert(*k, v_var);
+        }
+
+        Self {
+            cs: cs.clone(),
+            value: value.clone(),
+            sibling_hashes,
+            self_columns,
+            siblings_columns,
+        }
+    }
+
+    pub fn verify(&mut self, root: &HashVar, query: &BitsVar) {
+        // verify that the Merkle proof is valid
+        self.value.verify();
+        assert_eq!(root.value, self.value.root.0);
+        assert_eq!(query.get_value().0, self.value.query as u32);
+
+        let mut self_hash = Poseidon31MerkleHasherVar::hash_m31_columns(
+            &self.self_columns.get(&self.value.depth).unwrap_or(&vec![]),
+        );
+        let mut sibling_hash = Poseidon31MerkleHasherVar::hash_m31_columns(
+            &self
+                .siblings_columns
+                .get(&self.value.depth)
+                .unwrap_or(&vec![]),
+        );
+
+        for i in 0..self.value.depth {
+            let h = self.value.depth - i - 1;
+
+            if !self.self_columns.contains_key(&h) {
+                self_hash = Poseidon31MerkleHasherVar::hash_tree_with_swap(
+                    &mut self_hash,
+                    &mut sibling_hash,
+                    query.value[i],
+                    query.variables[i],
+                );
+                if i != self.value.depth - 1 {
+                    sibling_hash = self.sibling_hashes[i].clone();
+                }
+            } else {
+                let mut self_column_hash = Poseidon31MerkleHasherVar::hash_m31_columns(
+                    &self.self_columns.get(&h).unwrap_or(&vec![]),
+                );
+                let mut sibling_column_hash = Poseidon31MerkleHasherVar::hash_m31_columns(
+                    &self.siblings_columns.get(&h).unwrap_or(&vec![]),
+                );
+
+                self_hash = Poseidon31MerkleHasherVar::hash_tree_with_column_hash_with_swap(
+                    &mut self_hash,
+                    &mut sibling_hash,
+                    query.value[i],
+                    query.variables[i],
+                    &mut self_column_hash,
+                );
+                sibling_hash = Poseidon31MerkleHasherVar::combine_hash_tree_with_column(
+                    &mut sibling_hash,
+                    &mut sibling_column_hash,
+                );
+            }
+        }
+
+        // check that the left_variable and right_variable are the same
+        // as though in self.root
+        let cs = self.cs().and(&root.cs()).and(&query.cs());
+        cs.insert_gate(self_hash.left_variable, 0, root.left_variable, M31::one());
+        cs.insert_gate(self_hash.right_variable, 0, root.right_variable, M31::one());
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct DecommitmentVar {
     pub cs: ConstraintSystemRef,
@@ -412,13 +525,15 @@ impl DecommitmentVar {
 
 #[cfg(test)]
 mod test {
-    use crate::SinglePathMerkleProofVar;
+    use crate::{SinglePairMerkleProofVar, SinglePathMerkleProofVar};
     use circle_plonk_dsl_bits::BitsVar;
     use circle_plonk_dsl_channel::HashVar;
     use circle_plonk_dsl_constraint_system::dvar::AllocVar;
     use circle_plonk_dsl_constraint_system::ConstraintSystemRef;
     use circle_plonk_dsl_fields::M31Var;
-    use circle_plonk_dsl_hints::{FiatShamirHints, SinglePathMerkleProof};
+    use circle_plonk_dsl_hints::{
+        AnswerHints, FiatShamirHints, FirstLayerHints, SinglePathMerkleProof,
+    };
     use stwo_prover::core::fields::m31::M31;
     use stwo_prover::core::fri::FriConfig;
     use stwo_prover::core::pcs::PcsConfig;
@@ -426,7 +541,7 @@ mod test {
     use stwo_prover::examples::plonk_with_poseidon::air::PlonkWithPoseidonProof;
 
     #[test]
-    fn test_merkle_proof() {
+    fn test_merkle_path_proof() {
         let proof: PlonkWithPoseidonProof<Poseidon31MerkleHasher> =
             bincode::deserialize(include_bytes!("../../test_data/joint_proof.bin")).unwrap();
         let config = PcsConfig {
@@ -459,6 +574,32 @@ mod test {
         let root = HashVar::new_witness(&cs, &proof.stark_proof.commitments[0].0);
         for proof in proofs.iter() {
             let mut proof_var = SinglePathMerkleProofVar::new_single_use_merkle_proof(&cs, proof);
+            let query = M31Var::new_witness(&cs, &M31::from(proof.query));
+            let query_bits = BitsVar::from_m31(&query, proof.depth);
+            proof_var.verify(&root, &query_bits);
+        }
+    }
+
+    #[test]
+    fn test_merkle_pair_proof() {
+        let proof: PlonkWithPoseidonProof<Poseidon31MerkleHasher> =
+            bincode::deserialize(include_bytes!("../../test_data/joint_proof.bin")).unwrap();
+        let config = PcsConfig {
+            pow_bits: 20,
+            fri_config: FriConfig::new(0, 5, 16),
+        };
+
+        let fiat_shamir_hints = FiatShamirHints::new(&proof, config);
+        let answer_hints = AnswerHints::compute(&fiat_shamir_hints, &proof);
+        let first_layer_hints = FirstLayerHints::compute(&fiat_shamir_hints, &answer_hints, &proof);
+        for proof in first_layer_hints.merkle_proofs.iter() {
+            proof.verify();
+        }
+
+        let cs = ConstraintSystemRef::new_ref();
+        let root = HashVar::new_witness(&cs, &proof.stark_proof.fri_proof.first_layer.commitment.0);
+        for proof in first_layer_hints.merkle_proofs.iter() {
+            let mut proof_var = SinglePairMerkleProofVar::new_single_use_merkle_proof(&cs, proof);
             let query = M31Var::new_witness(&cs, &M31::from(proof.query));
             let query_bits = BitsVar::from_m31(&query, proof.depth);
             proof_var.verify(&root, &query_bits);
