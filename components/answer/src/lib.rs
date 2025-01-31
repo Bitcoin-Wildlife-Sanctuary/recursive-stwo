@@ -16,21 +16,20 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::iter::zip;
 use std::ops::Add;
 use stwo_prover::constraint_framework::PREPROCESSED_TRACE_IDX;
-use stwo_prover::core::backend::Col;
 use stwo_prover::core::pcs::TreeVec;
 use stwo_prover::core::poly::circle::CanonicCoset;
 use stwo_prover::core::ColumnVec;
 
 pub mod data_structures;
 
-pub struct FRIAnswerResults {
+pub struct AnswerResults {
     pub cs: ConstraintSystemRef,
     pub query_positions_per_log_size: BTreeMap<u32, Vec<BitsVar>>,
     pub fri_answers: ColumnVec<Vec<QM31Var>>,
     pub domain_points: ColumnVec<Vec<CirclePointM31Var>>,
 }
 
-impl FRIAnswerResults {
+impl AnswerResults {
     pub fn compute(
         oods_point: &CirclePointQM31Var,
         fiat_shamir_hints: &FiatShamirHints,
@@ -38,7 +37,7 @@ impl FRIAnswerResults {
         fri_answer_hints: &AnswerHints,
         decommit_hints: &DecommitHints,
         proof: &PlonkWithPoseidonProofVar,
-    ) -> FRIAnswerResults {
+    ) -> AnswerResults {
         let cs = oods_point.cs();
 
         let mut all_shifts_plonk = HashSet::new();
@@ -391,7 +390,7 @@ impl FRIAnswerResults {
 
 #[cfg(test)]
 mod test {
-    use crate::FRIAnswerResults;
+    use crate::AnswerResults;
     use circle_plonk_dsl_circle::CirclePointQM31Var;
     use circle_plonk_dsl_constraint_system::dvar::AllocVar;
     use circle_plonk_dsl_constraint_system::ConstraintSystemRef;
@@ -427,7 +426,7 @@ mod test {
         let fri_answer_hints = AnswerHints::compute(&fiat_shamir_hints, &proof);
         let decommitment_hints = DecommitHints::compute(&fiat_shamir_hints, &proof);
 
-        FRIAnswerResults::compute(
+        AnswerResults::compute(
             &CirclePointQM31Var::new_witness(&cs, &fiat_shamir_hints.oods_point),
             &fiat_shamir_hints,
             &fiat_shamir_results,

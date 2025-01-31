@@ -452,11 +452,13 @@ impl SinglePairMerkleProofVar {
                     &mut self_column_hash,
                 );
                 sibling_hash = Poseidon31MerkleHasherVar::combine_hash_tree_with_column(
-                    &mut sibling_hash,
+                    &mut self.sibling_hashes[i],
                     &mut sibling_column_hash,
                 );
             }
         }
+
+        assert_eq!(self_hash.value, root.value);
 
         // check that the left_variable and right_variable are the same
         // as though in self.root

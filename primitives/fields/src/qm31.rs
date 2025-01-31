@@ -418,6 +418,54 @@ impl QM31Var {
         }
     }
 
+    pub fn select(a: &Self, b: &Self, bit_value: bool, bit_variable: usize) -> Self {
+        let cs = a.cs().and(&b.cs());
+
+        let value = if !bit_value { a.value } else { b.value };
+
+        // the result is a + (b - a) * bit_value
+        let b_minus_a = b - a;
+        let mut variable = cs.mul(b_minus_a.variable, bit_variable);
+        variable = cs.add(a.variable, variable);
+
+        Self {
+            cs,
+            value,
+            variable,
+        }
+    }
+
+    pub fn swap(a: &Self, b: &Self, bit_value: bool, bit_variable: usize) -> (Self, Self) {
+        let cs = a.cs().and(&b.cs());
+
+        let (left_value, right_value) = if !bit_value {
+            (a.value, b.value)
+        } else {
+            (b.value, a.value)
+        };
+
+        let b_minus_a = b - a;
+        let mut left_variable = cs.mul(b_minus_a.variable, bit_variable);
+        left_variable = cs.add(a.variable, left_variable);
+
+        let a_minus_b = a - b;
+        let mut right_variable = cs.mul(a_minus_b.variable, bit_variable);
+        right_variable = cs.add(b.variable, right_variable);
+
+        (
+            Self {
+                cs: cs.clone(),
+                value: left_value,
+                variable: left_variable,
+            },
+            Self {
+                cs,
+                value: right_value,
+                variable: right_variable,
+            },
+        )
+    }
+
     pub fn shift_by_ij(&self) -> QM31Var {
         self.shift_by_i().shift_by_j()
     }

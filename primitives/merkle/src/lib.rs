@@ -62,7 +62,8 @@ impl Poseidon31MerkleHasherVar {
         bit_variable: usize,
         column_hash: &mut Poseidon2HalfStateRef,
     ) -> Poseidon2HalfStateRef {
-        let mut hash_tree = Poseidon2HalfStateRef::swap_compress(left, right, bit_value, bit_variable);
+        let mut hash_tree =
+            Poseidon2HalfStateRef::swap_compress(left, right, bit_value, bit_variable);
         Self::combine_hash_tree_with_column(&mut hash_tree, column_hash)
     }
 

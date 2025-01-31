@@ -22,6 +22,8 @@ pub struct FiatShamirResults {
     pub after_sampled_values_random_coeff: QM31Var,
     pub oods_point: CirclePointQM31Var,
     pub raw_queries: Vec<M31Var>,
+
+    pub fri_alphas: Vec<QM31Var>,
 }
 
 impl FiatShamirResults {
@@ -156,6 +158,7 @@ impl FiatShamirResults {
             after_sampled_values_random_coeff,
             oods_point,
             raw_queries,
+            fri_alphas,
         }
     }
 }
