@@ -495,8 +495,9 @@ impl InnerLayersHints {
             let domain = Coset::half_odds(log_size);
 
             let mut fri_witness = inner_layer.fri_witness.iter();
-
             let mut new_folded = BTreeMap::new();
+            let mut decommitmented = BTreeMap::new();
+
             for (k, &v) in folded.iter() {
                 let sibling_v = if let Some(&sibling_v) = folded.get(&(k ^ 1)) {
                     sibling_v
@@ -512,6 +513,10 @@ impl InnerLayersHints {
 
                 let folded_query = k >> 1;
                 let left_idx = folded_query << 1;
+                let right_idx = left_idx + 1;
+
+                decommitmented.insert(left_idx, left_v);
+                decommitmented.insert(right_idx, right_v);
 
                 let point = domain.at(bit_reverse_index(left_idx, log_size));
                 let x_inv = point.x.inverse();
@@ -522,6 +527,25 @@ impl InnerLayersHints {
 
                 new_folded.insert(folded_query, folded_value);
             }
+
+            let decommitment_positions = decommitmented.keys().copied().collect_vec();
+            let decommitmented_values = decommitmented
+                .values()
+                .map(|v| v.to_m31_array())
+                .flatten()
+                .collect_vec();
+
+            let merkle_verifier: MerkleVerifier<Poseidon31MerkleHasher> = MerkleVerifier::new(
+                inner_layer.commitment,
+                vec![log_size; SECURE_EXTENSION_DEGREE],
+            );
+            merkle_verifier
+                .verify(
+                    &BTreeMap::from_iter([(log_size, decommitment_positions)]),
+                    decommitmented_values,
+                    inner_layer.decommitment.clone(),
+                )
+                .unwrap();
 
             assert!(fri_witness.next().is_none());
             folded = new_folded;
