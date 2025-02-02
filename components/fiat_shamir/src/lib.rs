@@ -1,13 +1,15 @@
 use circle_plonk_dsl_bits::BitsVar;
 use circle_plonk_dsl_channel::{ChannelVar, HashVar};
 use circle_plonk_dsl_circle::CirclePointQM31Var;
-use circle_plonk_dsl_constraint_system::dvar::DVar;
+use circle_plonk_dsl_constraint_system::dvar::{AllocVar, DVar};
 use circle_plonk_dsl_data_structures::{
     PlonkWithAcceleratorLookupElementsVar, PlonkWithPoseidonProofVar,
 };
 use circle_plonk_dsl_fields::{M31Var, QM31Var};
 use circle_plonk_dsl_hints::FiatShamirHints;
+use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::fields::FieldExpOps;
+use stwo_prover::core::pcs::PcsConfig;
 
 pub struct FiatShamirResults {
     pub preprocessed_commitment: HashVar,
@@ -30,6 +32,8 @@ impl FiatShamirResults {
     pub fn compute(
         fiat_shamir_hints: &FiatShamirHints,
         proof: &mut PlonkWithPoseidonProofVar,
+        pcs_config: PcsConfig,
+        inputs: &[(usize, QM31Var)],
     ) -> Self {
         let cs = proof.cs();
 
@@ -106,12 +110,10 @@ impl FiatShamirResults {
             .compose_range(0..20);
         lower_bits.equalverify(&M31Var::zero(&cs));
 
-        let mut raw_queries = Vec::with_capacity(16);
-        let mut draw_queries_felts = Vec::with_capacity(4);
-        {
-            let [a, b] = channel.get_felts();
-            draw_queries_felts.push(a);
-            draw_queries_felts.push(b);
+        let mut raw_queries = Vec::with_capacity(pcs_config.fri_config.n_queries);
+        let mut draw_queries_felts =
+            Vec::with_capacity(pcs_config.fri_config.n_queries.div_ceil(4));
+        for _ in 0..pcs_config.fri_config.n_queries.div_ceil(4) {
             let [a, b] = channel.get_felts();
             draw_queries_felts.push(a);
             draw_queries_felts.push(b);
@@ -119,12 +121,20 @@ impl FiatShamirResults {
         for felt in draw_queries_felts.iter() {
             raw_queries.extend_from_slice(&felt.decompose_m31());
         }
+        raw_queries.truncate(pcs_config.fri_config.n_queries);
 
         // enforce the total sum
-        let one_sum = (&(&(&lookup_elements.alpha * &M31Var::one(&cs)) + &M31Var::one(&cs))
-            - &lookup_elements.z)
-            .inv();
-        (&(&one_sum + &proof.stmt1.poseidon_total_sum) + &proof.stmt1.plonk_total_sum)
+        let mut input_sum = QM31Var::zero(&cs);
+        for (idx, v) in inputs.iter() {
+            let v = v.decompose_m31();
+            let mut sum = &M31Var::new_constant(&cs, &M31::from(*idx as u32)) - &lookup_elements.z;
+            sum = &sum + &(&lookup_elements.alpha_powers[1] * &v[0]);
+            sum = &sum + &(&lookup_elements.alpha_powers[2] * &v[1]);
+            sum = &sum + &(&lookup_elements.alpha_powers[3] * &v[2]);
+            sum = &sum + &(&lookup_elements.alpha_powers[4] * &v[3]);
+            input_sum = &input_sum + &sum.inv();
+        }
+        (&(&input_sum + &proof.stmt1.poseidon_total_sum) + &proof.stmt1.plonk_total_sum)
             .equalverify(&QM31Var::zero(&cs));
 
         assert_eq!(lookup_elements.z.value, fiat_shamir_hints.z);
@@ -169,6 +179,7 @@ mod test {
     use circle_plonk_dsl_constraint_system::dvar::AllocVar;
     use circle_plonk_dsl_constraint_system::ConstraintSystemRef;
     use circle_plonk_dsl_data_structures::PlonkWithPoseidonProofVar;
+    use circle_plonk_dsl_fields::QM31Var;
     use circle_plonk_dsl_hints::FiatShamirHints;
     use num_traits::One;
     use stwo_prover::core::fields::qm31::QM31;
@@ -184,18 +195,23 @@ mod test {
     #[test]
     fn test_fiat_shamir() {
         let proof: PlonkWithPoseidonProof<Poseidon31MerkleHasher> =
-            bincode::deserialize(include_bytes!("../../test_data/joint_proof.bin")).unwrap();
+            bincode::deserialize(include_bytes!("../../test_data/small_proof.bin")).unwrap();
         let config = PcsConfig {
             pow_bits: 20,
             fri_config: FriConfig::new(0, 5, 16),
         };
 
-        let fiat_shamir_hints = FiatShamirHints::new(&proof, config);
+        let fiat_shamir_hints = FiatShamirHints::new(&proof, config, &[(1, QM31::one())]);
 
         let cs = ConstraintSystemRef::new_ref();
         let mut proof_var = PlonkWithPoseidonProofVar::new_witness(&cs, &proof);
 
-        let _results = FiatShamirResults::compute(&fiat_shamir_hints, &mut proof_var);
+        let _results = FiatShamirResults::compute(
+            &fiat_shamir_hints,
+            &mut proof_var,
+            config,
+            &[(1, QM31Var::one(&cs))],
+        );
 
         cs.pad();
         cs.check_arithmetics();

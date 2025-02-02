@@ -216,9 +216,10 @@ mod test {
         let mut test_hash_right_var =
             Poseidon2HalfStateRef::new_single_use_witness(&cs, &test_hash_right);
 
-        let a = Poseidon31MerkleHasherVar::hash_tree_with_column_hash(
-            &mut test_hash_left_var,
-            &mut test_hash_right_var,
+        let mut a =
+            Poseidon31MerkleHasherVar::hash_tree(&mut test_hash_left_var, &mut test_hash_right_var);
+        a = Poseidon31MerkleHasherVar::combine_hash_tree_with_column(
+            &mut a,
             &mut test_hash_column_var,
         );
         let b = Poseidon31MerkleHasher::hash_node(

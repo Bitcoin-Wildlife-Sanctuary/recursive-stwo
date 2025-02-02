@@ -92,6 +92,8 @@ impl AnswerHints {
 #[cfg(test)]
 mod test {
     use crate::{AnswerHints, FiatShamirHints};
+    use num_traits::One;
+    use stwo_prover::core::fields::qm31::QM31;
     use stwo_prover::core::fri::FriConfig;
     use stwo_prover::core::pcs::PcsConfig;
     use stwo_prover::core::vcs::poseidon31_merkle::Poseidon31MerkleHasher;
@@ -100,13 +102,13 @@ mod test {
     #[test]
     fn test_compute_fri_answer_hints() {
         let proof: PlonkWithPoseidonProof<Poseidon31MerkleHasher> =
-            bincode::deserialize(include_bytes!("../../test_data/joint_proof.bin")).unwrap();
+            bincode::deserialize(include_bytes!("../../test_data/small_proof.bin")).unwrap();
         let config = PcsConfig {
             pow_bits: 20,
             fri_config: FriConfig::new(0, 5, 16),
         };
 
-        let fiat_shamir_hints = FiatShamirHints::new(&proof, config);
+        let fiat_shamir_hints = FiatShamirHints::new(&proof, config, &[(1, QM31::one())]);
         let _fri_answer_hints = AnswerHints::compute(&fiat_shamir_hints, &proof);
     }
 }

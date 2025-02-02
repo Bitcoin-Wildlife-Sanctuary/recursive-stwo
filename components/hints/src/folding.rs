@@ -22,8 +22,8 @@ pub struct SinglePairMerkleProof {
     pub query: usize,
 
     pub sibling_hashes: Vec<Poseidon31Hash>,
-    pub self_columns: BTreeMap<usize, Vec<M31>>,
-    pub siblings_columns: BTreeMap<usize, Vec<M31>>,
+    pub self_columns: BTreeMap<usize, QM31>,
+    pub siblings_columns: BTreeMap<usize, QM31>,
 
     pub root: Poseidon31Hash,
     pub depth: usize,
@@ -33,11 +33,17 @@ impl SinglePairMerkleProof {
     pub fn verify(&self) {
         let mut self_hash = Poseidon31MerkleHasher::hash_node(
             None,
-            &self.self_columns.get(&self.depth).unwrap_or(&vec![]),
+            &self
+                .self_columns
+                .get(&self.depth)
+                .map_or(vec![], |v| v.to_m31_array().to_vec()),
         );
         let mut sibling_hash = Poseidon31MerkleHasher::hash_node(
             None,
-            &self.siblings_columns.get(&self.depth).unwrap_or(&vec![]),
+            &self
+                .siblings_columns
+                .get(&self.depth)
+                .map_or(vec![], |v| v.to_m31_array().to_vec()),
         );
 
         for i in 0..self.depth {
@@ -62,11 +68,17 @@ impl SinglePairMerkleProof {
                     } else {
                         Some((sibling_hash, self_hash))
                     },
-                    &self.self_columns.get(&h).unwrap_or(&vec![]),
+                    &self
+                        .self_columns
+                        .get(&h)
+                        .map_or(vec![], |v| v.to_m31_array().to_vec()),
                 );
                 sibling_hash = {
                     let column_hash = Poseidon31MerkleHasher::hash_column(
-                        self.siblings_columns.get(&h).unwrap_or(&vec![]),
+                        &self
+                            .siblings_columns
+                            .get(&h)
+                            .map_or(vec![], |v| v.to_m31_array().to_vec()),
                     );
                     let mut state = [M31::zero(); 16];
                     state[..8].copy_from_slice(&self.sibling_hashes[i].0);
@@ -223,8 +235,12 @@ impl SinglePairMerkleProof {
                         .get(&sibling_idx)
                         .unwrap();
 
-                    self_columns.insert(current_log_size as usize, self_value.to_vec());
-                    siblings_columns.insert(current_log_size as usize, sibling_value.to_vec());
+                    self_columns
+                        .insert(current_log_size as usize, QM31::from_m31_array(*self_value));
+                    siblings_columns.insert(
+                        current_log_size as usize,
+                        QM31::from_m31_array(*sibling_value),
+                    );
 
                     if current_log_size != max_log_size {
                         let sibling_left = sibling_idx << 1;
@@ -273,7 +289,6 @@ impl SinglePairMerkleProof {
 
 #[derive(Clone)]
 pub struct FirstLayerHints {
-    pub siblings: BTreeMap<u32, BTreeMap<usize, SecureField>>,
     pub merkle_proofs: Vec<SinglePairMerkleProof>,
     pub folded_evals_by_column: BTreeMap<u32, Vec<SecureField>>,
 }
@@ -305,7 +320,6 @@ impl FirstLayerHints {
 
         let mut decommitment_positions_by_log_size = BTreeMap::new();
         let mut decommitmented_values = vec![];
-        let mut siblings = BTreeMap::new();
 
         let mut folded_evals_by_column = BTreeMap::new();
 
@@ -319,15 +333,13 @@ impl FirstLayerHints {
             let queries =
                 &fiat_shamir_hints.query_positions_per_log_size[&column_domain.log_size()];
 
-            let (results, column_decommitment_positions, sparse_evaluation) =
+            let (column_decommitment_positions, sparse_evaluation) =
                 Self::compute_decommitment_positions_and_rebuild_evals(
                     queries,
                     column_domain.log_size(),
                     &column_query_evals,
                     &mut fri_witness,
                 );
-
-            siblings.insert(column_domain.log_size(), results);
 
             // Columns of the same size have the same decommitment positions.
             decommitment_positions_by_log_size
@@ -394,7 +406,6 @@ impl FirstLayerHints {
         );
 
         FirstLayerHints {
-            siblings,
             merkle_proofs,
             folded_evals_by_column,
         }
@@ -405,14 +416,12 @@ impl FirstLayerHints {
         domain_log_size: u32,
         query_evals: &[SecureField],
         mut witness_evals: impl Iterator<Item = SecureField>,
-    ) -> (BTreeMap<usize, SecureField>, Vec<usize>, SparseEvaluation) {
+    ) -> (Vec<usize>, SparseEvaluation) {
         let mut queries = queries.to_vec();
         queries.dedup();
         queries.sort_unstable();
 
         let mut query_evals = query_evals.iter().copied();
-
-        let mut results = BTreeMap::new();
 
         let mut decommitment_positions = Vec::new();
         let mut subset_evals = Vec::new();
@@ -435,31 +444,16 @@ impl FirstLayerHints {
 
             subset_evals.push(subset_eval.clone());
             subset_domain_index_initials.push(bit_reverse_index(subset_start, domain_log_size));
-
-            if subset_queries[0] == subset_start {
-                results.insert(subset_queries[0], subset_eval[0]);
-            } else {
-                results.insert(subset_queries[0], subset_eval[1]);
-            }
-
-            if subset_queries.len() == 2 {
-                if subset_queries[1] == subset_start {
-                    results.insert(subset_queries[1], subset_eval[0]);
-                } else {
-                    results.insert(subset_queries[1], subset_eval[1]);
-                }
-            }
         }
 
         let sparse_evaluation = SparseEvaluation::new(subset_evals, subset_domain_index_initials);
-        (results, decommitment_positions, sparse_evaluation)
+        (decommitment_positions, sparse_evaluation)
     }
 }
 
 pub struct InnerLayersHints {
-    pub siblings: BTreeMap<u32, BTreeMap<usize, SecureField>>,
-    //pub merkle_proofs: BTreeMap<u32, BTreeMap<usize, SecureField>>,
-    pub folded_evals_by_column: BTreeMap<usize, Vec<SecureField>>,
+    pub merkle_proofs: BTreeMap<u32, Vec<SinglePairMerkleProof>>,
+    pub folded_intermediate_results: BTreeMap<u32, BTreeMap<usize, SecureField>>,
 }
 
 impl InnerLayersHints {
@@ -467,7 +461,7 @@ impl InnerLayersHints {
         folded_evals_by_column: &BTreeMap<u32, Vec<SecureField>>,
         fiat_shamir_hints: &FiatShamirHints,
         proof: &PlonkWithPoseidonProof<Poseidon31MerkleHasher>,
-    ) {
+    ) -> InnerLayersHints {
         let mut log_size = fiat_shamir_hints.max_first_layer_column_log_size;
 
         let mut folded = BTreeMap::new();
@@ -481,10 +475,12 @@ impl InnerLayersHints {
             folded.insert(i, QM31::zero());
         }
 
+        let mut all_merkle_proofs = BTreeMap::new();
+        let mut all_folded_intermediate_results = BTreeMap::new();
+
         for (i, inner_layer) in proof.stark_proof.fri_proof.inner_layers.iter().enumerate() {
             if let Some(folded_into) = folded_evals_by_column.get(&log_size) {
                 assert_eq!(folded_into.len(), folded.len());
-
                 for ((_, v), b) in folded.iter_mut().zip(folded_into.iter()) {
                     *v = fiat_shamir_hints.fri_alphas[0].square() * *v + *b;
                 }
@@ -542,17 +538,41 @@ impl InnerLayersHints {
             merkle_verifier
                 .verify(
                     &BTreeMap::from_iter([(log_size, decommitment_positions)]),
-                    decommitmented_values,
+                    decommitmented_values.clone(),
                     inner_layer.decommitment.clone(),
                 )
                 .unwrap();
 
+            let merkle_proofs = SinglePairMerkleProof::from_stwo_proof(
+                &BTreeSet::from([log_size]),
+                inner_layer.commitment.clone(),
+                &fiat_shamir_hints
+                    .raw_query_positions_per_log_size
+                    .get(&fiat_shamir_hints.max_first_layer_column_log_size)
+                    .unwrap()
+                    .iter()
+                    .map(|v| *v >> (fiat_shamir_hints.max_first_layer_column_log_size - log_size))
+                    .collect_vec(),
+                &decommitmented_values,
+                &inner_layer.decommitment,
+            );
+            for merkle_proof in merkle_proofs.iter() {
+                merkle_proof.verify();
+            }
+            all_merkle_proofs.insert(log_size, merkle_proofs);
+
             assert!(fri_witness.next().is_none());
+            all_folded_intermediate_results.insert(log_size, folded.clone());
             folded = new_folded;
         }
 
         for (_, v) in folded.iter() {
             assert_eq!(v, &fiat_shamir_hints.last_layer_evaluation);
+        }
+
+        Self {
+            merkle_proofs: all_merkle_proofs,
+            folded_intermediate_results: all_folded_intermediate_results,
         }
     }
 }
@@ -560,6 +580,8 @@ impl InnerLayersHints {
 #[cfg(test)]
 mod test {
     use crate::{AnswerHints, FiatShamirHints, FirstLayerHints, InnerLayersHints};
+    use num_traits::One;
+    use stwo_prover::core::fields::qm31::QM31;
     use stwo_prover::core::fri::FriConfig;
     use stwo_prover::core::pcs::PcsConfig;
     use stwo_prover::core::vcs::poseidon31_merkle::Poseidon31MerkleHasher;
@@ -568,13 +590,13 @@ mod test {
     #[test]
     fn test_folding() {
         let proof: PlonkWithPoseidonProof<Poseidon31MerkleHasher> =
-            bincode::deserialize(include_bytes!("../../test_data/joint_proof.bin")).unwrap();
+            bincode::deserialize(include_bytes!("../../test_data/small_proof.bin")).unwrap();
         let config = PcsConfig {
             pow_bits: 20,
             fri_config: FriConfig::new(0, 5, 16),
         };
 
-        let fiat_shamir_hints = FiatShamirHints::new(&proof, config);
+        let fiat_shamir_hints = FiatShamirHints::new(&proof, config, &[(1, QM31::one())]);
         let answer_hints = AnswerHints::compute(&fiat_shamir_hints, &proof);
         let first_layer_hints = FirstLayerHints::compute(&fiat_shamir_hints, &answer_hints, &proof);
         for proof in first_layer_hints.merkle_proofs.iter() {

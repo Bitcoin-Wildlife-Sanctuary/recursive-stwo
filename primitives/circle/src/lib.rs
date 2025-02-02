@@ -6,10 +6,9 @@ use circle_plonk_dsl_fields::{M31Var, QM31Var};
 use itertools::Itertools;
 use num_traits::{One, Zero};
 use std::ops::{Add, Neg};
-use stwo_prover::core::circle::CirclePoint;
+use stwo_prover::core::circle::{CirclePoint, Coset};
 use stwo_prover::core::fields::m31::{BaseField, M31};
 use stwo_prover::core::fields::qm31::{SecureField, QM31};
-use stwo_prover::core::poly::circle::CircleDomain;
 
 #[derive(Clone, Debug)]
 pub struct CirclePointM31Var {
@@ -120,12 +119,12 @@ impl CirclePointM31Var {
 }
 
 impl CirclePointM31Var {
-    pub fn bit_reverse_at(circle_domain: &CircleDomain, bits_var: &BitsVar, log_size: u32) -> Self {
+    pub fn bit_reverse_at(coset: &Coset, bits_var: &BitsVar, log_size: u32) -> Self {
         assert_eq!(bits_var.value.len(), log_size as usize);
         let cs = bits_var.cs();
 
-        let initial = circle_domain.half_coset.initial;
-        let step = circle_domain.half_coset.step;
+        let initial = coset.initial;
+        let step = coset.step;
 
         let mut steps = Vec::with_capacity((log_size - 1) as usize);
         let mut cur = step;
@@ -255,8 +254,8 @@ mod test {
         let a_bits = BitsVar::from_m31(&a_index, 16);
         let b_bits = BitsVar::from_m31(&b_index, 16);
 
-        let a_point = CirclePointM31Var::bit_reverse_at(&circle_domain, &a_bits, 16);
-        let b_point = CirclePointM31Var::bit_reverse_at(&circle_domain, &b_bits, 16);
+        let a_point = CirclePointM31Var::bit_reverse_at(&circle_domain.half_coset, &a_bits, 16);
+        let b_point = CirclePointM31Var::bit_reverse_at(&circle_domain.half_coset, &b_bits, 16);
 
         assert_eq!(a.x, a_point.x.value);
         assert_eq!(a.y, a_point.y.value);

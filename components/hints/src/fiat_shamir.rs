@@ -1,12 +1,12 @@
 use itertools::Itertools;
-use num_traits::{One, Zero};
+use num_traits::Zero;
 use std::collections::{BTreeMap, BTreeSet};
 use stwo_prover::constraint_framework::{Relation, PREPROCESSED_TRACE_IDX};
 use stwo_prover::core::air::{Component, Components};
 use stwo_prover::core::channel::{Channel, Poseidon31Channel};
 use stwo_prover::core::circle::CirclePoint;
 use stwo_prover::core::fields::m31::M31;
-use stwo_prover::core::fields::qm31::SecureField;
+use stwo_prover::core::fields::qm31::{SecureField, QM31};
 use stwo_prover::core::fields::secure_column::SECURE_EXTENSION_DEGREE;
 use stwo_prover::core::fields::FieldExpOps;
 use stwo_prover::core::fri::{CirclePolyDegreeBound, FriVerifier};
@@ -63,6 +63,7 @@ impl FiatShamirHints {
     pub fn new(
         proof: &PlonkWithPoseidonProof<Poseidon31MerkleHasher>,
         config: PcsConfig,
+        inputs: &[(usize, QM31)],
     ) -> FiatShamirHints {
         let channel = &mut Poseidon31Channel::default();
         let commitment_scheme =
@@ -86,13 +87,6 @@ impl FiatShamirHints {
 
         let components =
             PlonkWithPoseidonComponents::new(&proof.stmt0, &lookup_elements, &proof.stmt1);
-        let one_sum: SecureField = lookup_elements.combine(&[
-            M31::one(),
-            M31::one(),
-            M31::zero(),
-            M31::zero(),
-            M31::zero(),
-        ]);
 
         let plonk_tree_subspan = components.plonk.trace_locations().to_vec();
         let plonk_prepared_column_indices = components.plonk.preproccessed_column_indices();
@@ -103,8 +97,19 @@ impl FiatShamirHints {
         let mask_plonk = components.plonk.info.mask_offsets.clone();
         let mask_poseidon = components.poseidon.info.mask_offsets.clone();
 
-        let total_sum =
-            proof.stmt1.plonk_total_sum + one_sum.inverse() + proof.stmt1.poseidon_total_sum;
+        let mut input_sum = SecureField::zero();
+        for (idx, val) in inputs.iter() {
+            let sum: SecureField = lookup_elements.combine(&[
+                M31::from(*idx as u32),
+                val.0 .0,
+                val.0 .1,
+                val.1 .0,
+                val.1 .1,
+            ]);
+            input_sum += sum.inverse();
+        }
+
+        let total_sum = proof.stmt1.plonk_total_sum + input_sum + proof.stmt1.poseidon_total_sum;
         assert_eq!(total_sum, SecureField::zero());
 
         let n_preprocessed_columns = commitment_scheme.trees[PREPROCESSED_TRACE_IDX]

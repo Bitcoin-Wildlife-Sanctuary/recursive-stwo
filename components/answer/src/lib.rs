@@ -16,7 +16,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::iter::zip;
 use std::ops::Add;
 use stwo_prover::constraint_framework::PREPROCESSED_TRACE_IDX;
-use stwo_prover::core::pcs::TreeVec;
+use stwo_prover::core::pcs::{PcsConfig, TreeVec};
 use stwo_prover::core::poly::circle::CanonicCoset;
 use stwo_prover::core::ColumnVec;
 
@@ -37,6 +37,7 @@ impl AnswerResults {
         fri_answer_hints: &AnswerHints,
         decommit_hints: &DecommitHints,
         proof: &PlonkWithPoseidonProofVar,
+        pcs_config: PcsConfig,
     ) -> AnswerResults {
         let cs = oods_point.cs();
 
@@ -198,8 +199,9 @@ impl AnswerResults {
             sorted_queries.dedup();
 
             if *column_log_size == fiat_shamir_hints.max_first_layer_column_log_size {
-                assert_eq!(sorted_queries.len(), 16,
-                    "The implementation does not support the situation when the first 16 attempts in sampling queries end up duplicated queries"
+                assert_eq!(sorted_queries.len(), pcs_config.fri_config.n_queries,
+                    "The implementation does not support the situation when the first {} attempts in sampling queries end up duplicated queries",
+                           pcs_config.fri_config.n_queries
                 );
             }
 
@@ -373,8 +375,11 @@ impl AnswerResults {
         for (query_position, queried_values_at_row) in
             query_positions.iter().zip(queried_values.iter())
         {
-            let domain_point =
-                CirclePointM31Var::bit_reverse_at(&commitment_domain, query_position, log_size);
+            let domain_point = CirclePointM31Var::bit_reverse_at(
+                &commitment_domain.half_coset,
+                query_position,
+                log_size,
+            );
             quotient_evals_at_queries.push(accumulate_row_quotients_var(
                 &sample_batches,
                 &queried_values_at_row,
@@ -396,6 +401,7 @@ mod test {
     use circle_plonk_dsl_constraint_system::ConstraintSystemRef;
     use circle_plonk_dsl_data_structures::PlonkWithPoseidonProofVar;
     use circle_plonk_dsl_fiat_shamir::FiatShamirResults;
+    use circle_plonk_dsl_fields::QM31Var;
     use circle_plonk_dsl_hints::{AnswerHints, DecommitHints, FiatShamirHints};
     use num_traits::One;
     use stwo_prover::core::fields::qm31::QM31;
@@ -411,18 +417,23 @@ mod test {
     #[test]
     fn test_answer() {
         let proof: PlonkWithPoseidonProof<Poseidon31MerkleHasher> =
-            bincode::deserialize(include_bytes!("../../test_data/joint_proof.bin")).unwrap();
+            bincode::deserialize(include_bytes!("../../test_data/small_proof.bin")).unwrap();
         let config = PcsConfig {
             pow_bits: 20,
             fri_config: FriConfig::new(0, 5, 16),
         };
 
-        let fiat_shamir_hints = FiatShamirHints::new(&proof, config);
+        let fiat_shamir_hints = FiatShamirHints::new(&proof, config, &[(1, QM31::one())]);
 
         let cs = ConstraintSystemRef::new_ref();
         let mut proof_var = PlonkWithPoseidonProofVar::new_witness(&cs, &proof);
 
-        let fiat_shamir_results = FiatShamirResults::compute(&fiat_shamir_hints, &mut proof_var);
+        let fiat_shamir_results = FiatShamirResults::compute(
+            &fiat_shamir_hints,
+            &mut proof_var,
+            config,
+            &[(1, QM31Var::one(&cs))],
+        );
         let fri_answer_hints = AnswerHints::compute(&fiat_shamir_hints, &proof);
         let decommitment_hints = DecommitHints::compute(&fiat_shamir_hints, &proof);
 
@@ -433,6 +444,7 @@ mod test {
             &fri_answer_hints,
             &decommitment_hints,
             &proof_var,
+            config,
         );
 
         cs.pad();

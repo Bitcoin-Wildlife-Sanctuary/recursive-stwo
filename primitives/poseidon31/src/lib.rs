@@ -174,8 +174,8 @@ impl Poseidon2HalfStateRef {
             let half_state_variable = cs.mul(0, 0);
             let addr_variable =
                 cs.new_m31(M31::from(half_state_variable), AllocationMode::Constant);
-            cs.set_cache("poseidon2 zero_half addr", half_state_variable);
-            cs.set_cache("poseidon2 zero_half", addr_variable);
+            cs.set_cache("poseidon2 zero_half addr", addr_variable);
+            cs.set_cache("poseidon2 zero_half", half_state_variable);
 
             Self {
                 cs: cs.clone(),

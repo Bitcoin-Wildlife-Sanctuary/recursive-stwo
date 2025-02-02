@@ -519,7 +519,7 @@ impl ConstraintSystem {
 
         for i in 0..n_vars {
             if mult_poseidon_vars[i] != 0 {
-                assert_eq!(counts[i], 1);
+                assert_eq!(counts[i], 1, "gate {} is not supposed to be reused", i);
             }
         }
 
