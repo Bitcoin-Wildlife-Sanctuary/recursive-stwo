@@ -141,9 +141,13 @@ fn main() {
     };
     let fast_verifier_config = PcsConfig {
         pow_bits: 20,
-        fri_config: FriConfig::new(0, 9, 9),
+        fri_config: FriConfig::new(0, 8, 10),
     };
     let fast_verifier2_config = PcsConfig {
+        pow_bits: 20,
+        fri_config: FriConfig::new(0, 9, 9),
+    };
+    let fast_verifier3_config = PcsConfig {
         pow_bits: 20,
         fri_config: FriConfig::new(0, 10, 8),
     };
@@ -222,7 +226,28 @@ fn main() {
         Path::new("data/level10-1.bin"),
         fast_verifier2_config,
         1,
-        Path::new("data/level10-1.bin"),
+        Path::new("data/level11-1.bin"),
+        fast_verifier2_config,
+    );
+    demo_recurse(
+        Path::new("data/level11-1.bin"),
+        fast_verifier2_config,
+        1,
+        Path::new("data/level12-1.bin"),
+        fast_verifier3_config,
+    );
+    demo_recurse(
+        Path::new("data/level12-1.bin"),
+        fast_verifier3_config,
+        1,
+        Path::new("data/level13-1.bin"),
+        fast_verifier3_config,
+    );
+    demo_recurse(
+        Path::new("data/level13-1.bin"),
+        fast_verifier3_config,
+        1,
+        Path::new("data/level14-1.bin"),
         fast_prover_config,
     );
 }
