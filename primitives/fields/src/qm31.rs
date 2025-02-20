@@ -512,13 +512,8 @@ mod test {
         cs.check_poseidon_invocations();
 
         let (plonk, mut poseidon) = cs.generate_circuit();
-        let proof = prove_plonk_with_poseidon::<Poseidon31MerkleChannel>(
-            plonk.mult_a.length.ilog2(),
-            poseidon.0.len().ilog2(),
-            config,
-            &plonk,
-            &mut poseidon,
-        );
+        let proof =
+            prove_plonk_with_poseidon::<Poseidon31MerkleChannel>(config, &plonk, &mut poseidon);
         verify_plonk_with_poseidon::<Poseidon31MerkleChannel>(
             proof,
             config,

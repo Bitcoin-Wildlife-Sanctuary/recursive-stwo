@@ -1,10 +1,11 @@
 use circle_plonk_dsl_constraint_system::dvar::DVar;
 use circle_plonk_dsl_data_structures::PlonkWithAcceleratorLookupElementsVar;
 use circle_plonk_dsl_fields::QM31Var;
-use stwo_prover::constraint_framework::preprocessed_columns::PreprocessedColumn;
+use stwo_prover::constraint_framework::preprocessed_columns::PreProcessedColumnId;
 use stwo_prover::constraint_framework::{
     INTERACTION_TRACE_IDX, ORIGINAL_TRACE_IDX, PREPROCESSED_TRACE_IDX,
 };
+use stwo_prover::core::fields::m31::BaseField;
 use stwo_prover::core::fields::secure_column::SECURE_EXTENSION_DEGREE;
 use stwo_prover::core::pcs::TreeVec;
 use stwo_prover::core::ColumnVec;
@@ -53,9 +54,8 @@ impl<'a> RelationEntryVar<'a> {
 
 pub struct LogupAtRowVar {
     pub interaction: usize,
-    pub total_sum: QM31Var,
+    pub cumsum_shift: QM31Var,
     pub fracs: Vec<(QM31Var, QM31Var)>,
-    pub is_first: QM31Var,
     pub is_finalized: bool,
     pub log_size: u32,
 }
@@ -64,9 +64,9 @@ impl LogupAtRowVar {
     pub fn new(interaction: usize, total_sum: QM31Var, log_size: u32) -> Self {
         LogupAtRowVar {
             interaction,
-            total_sum: total_sum.clone(),
+            cumsum_shift: total_sum
+                .mul_constant_m31(BaseField::from_u32_unchecked(1 << log_size).inverse()),
             fracs: vec![],
-            is_first: QM31Var::zero(&total_sum.cs()),
             is_finalized: true,
             log_size,
         }
@@ -109,7 +109,7 @@ impl<'a> EvalAtRowVar<'a> {
         mask_item
     }
 
-    pub fn get_preprocessed_column(&mut self, _column: PreprocessedColumn) -> QM31Var {
+    pub fn get_preprocessed_column(&mut self, _column: PreProcessedColumnId) -> QM31Var {
         let [mask_item] = self.next_interaction_mask(PREPROCESSED_TRACE_IDX, [0]);
         mask_item
     }
@@ -158,8 +158,6 @@ impl<'a> EvalAtRowVar<'a> {
         denom = &denom - &entry.relation.z;
 
         if self.logup.fracs.is_empty() {
-            self.logup.is_first = self
-                .get_preprocessed_column(PreprocessedColumn::IsFirst(self.logup.log_size as u32));
             self.logup.is_finalized = false;
         }
         self.logup.fracs.push((entry.multiplicity, denom));
@@ -186,7 +184,7 @@ impl<'a> EvalAtRowVar<'a> {
             batched_fracs.push((num, denom));
         }
 
-        let mut prev_col_cumsum = QM31Var::zero(&self.logup.total_sum.cs());
+        let mut prev_col_cumsum = QM31Var::zero(&self.logup.cumsum_shift.cs());
         for (num, denom) in batched_fracs.iter().take(num_batches - 1) {
             let [cur_cumsum] = self.next_extension_interaction_mask(self.logup.interaction, [0]);
             let diff = &cur_cumsum - &prev_col_cumsum;
@@ -199,12 +197,10 @@ impl<'a> EvalAtRowVar<'a> {
             let [prev_row_cumsum, cur_cumsum] =
                 self.next_extension_interaction_mask(self.logup.interaction, [-1, 0]);
 
-            // Fix `prev_row_cumsum` by subtracting `total_sum` if this is the first row.
-            let fixed_prev_row_cumsum =
-                &prev_row_cumsum - &(&self.logup.is_first * &self.logup.total_sum);
-            let diff = &(&cur_cumsum - &fixed_prev_row_cumsum) - &prev_col_cumsum;
+            let diff = &(&cur_cumsum - &prev_row_cumsum) - &prev_col_cumsum;
+            let fixed_diff = &diff + &self.logup.cumsum_shift;
 
-            self.add_constraint(&(&diff * denom) - num);
+            self.add_constraint(&(&fixed_diff * denom) - num);
             self.logup.is_finalized = true;
         }
     }

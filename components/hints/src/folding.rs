@@ -352,11 +352,11 @@ impl FirstLayerHints {
                     .flatten()
                     .flat_map(|qm31| qm31.to_m31_array()),
             );
-
             folded_evals_by_column.insert(
                 column_domain.log_size(),
                 sparse_evaluation.fold_circle(
-                    fiat_shamir_hints.fri_verifier.first_layer.folding_alpha,
+                    fiat_shamir_hints.fri_alphas
+                        [(max_column_log_size - column_domain.log_size()) as usize],
                     column_domain,
                 ),
             );
@@ -482,7 +482,7 @@ impl InnerLayersHints {
             if let Some(folded_into) = folded_evals_by_column.get(&log_size) {
                 assert_eq!(folded_into.len(), folded.len());
                 for ((_, v), b) in folded.iter_mut().zip(folded_into.iter()) {
-                    *v = fiat_shamir_hints.fri_alphas[0].square() * *v + *b;
+                    *v = fiat_shamir_hints.fri_alphas[i].square() * *v + *b;
                 }
             }
 

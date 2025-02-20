@@ -1,8 +1,7 @@
-use circle_plonk_dsl_constraint_system::dvar::{AllocationMode, DVar};
+use circle_plonk_dsl_constraint_system::dvar::DVar;
 use circle_plonk_dsl_fields::{M31Var, QM31Var};
 use circle_plonk_dsl_poseidon31::Poseidon2HalfStateRef;
 use std::cmp::min;
-use stwo_prover::core::fields::m31::M31;
 
 pub struct Poseidon31MerkleHasherVar;
 
@@ -15,8 +14,7 @@ impl Poseidon31MerkleHasherVar {
         let right_value = qm31[1].value.to_m31_array();
         let left_variable = qm31[0].variable;
         let right_variable = qm31[1].variable;
-        let half_state_variable = cs.mul(left_variable, right_variable);
-        let addr_variable = cs.new_m31(M31::from(half_state_variable), AllocationMode::Constant);
+        let half_state_variable = cs.assemble_poseidon_gate(left_variable, right_variable);
 
         Poseidon2HalfStateRef {
             cs,
@@ -29,9 +27,7 @@ impl Poseidon31MerkleHasherVar {
             }),
             left_variable,
             right_variable,
-            half_state_variable,
-            addr_variable,
-            disabled: false,
+            sel_value: half_state_variable,
         }
     }
 
@@ -39,9 +35,6 @@ impl Poseidon31MerkleHasherVar {
         left: &mut Poseidon2HalfStateRef,
         right: &mut Poseidon2HalfStateRef,
     ) -> Poseidon2HalfStateRef {
-        // assume that a witness must be used
-        assert!(left.addr_variable == 0 || right.addr_variable == 0);
-
         let (parent, _) = Poseidon2HalfStateRef::permute(left, right, false, true);
         parent
     }
@@ -52,7 +45,7 @@ impl Poseidon31MerkleHasherVar {
         bit_value: bool,
         bit_variable: usize,
     ) -> Poseidon2HalfStateRef {
-        Poseidon2HalfStateRef::swap_compress(left, right, bit_value, bit_variable)
+        Poseidon2HalfStateRef::swap_permute(left, right, bit_value, bit_variable)
     }
 
     pub fn hash_tree_with_column_hash_with_swap(
@@ -63,7 +56,7 @@ impl Poseidon31MerkleHasherVar {
         column_hash: &mut Poseidon2HalfStateRef,
     ) -> Poseidon2HalfStateRef {
         let mut hash_tree =
-            Poseidon2HalfStateRef::swap_compress(left, right, bit_value, bit_variable);
+            Poseidon2HalfStateRef::swap_permute(left, right, bit_value, bit_variable);
         Self::combine_hash_tree_with_column(&mut hash_tree, column_hash)
     }
 
@@ -115,7 +108,6 @@ impl Poseidon31MerkleHasherVar {
             let mut right = Poseidon2HalfStateRef::from_m31(&input);
             let (new_digest, _) =
                 Poseidon2HalfStateRef::permute(&mut digest, &mut right, false, true);
-
             digest = new_digest;
         }
 
@@ -130,12 +122,21 @@ mod test {
     use circle_plonk_dsl_constraint_system::ConstraintSystemRef;
     use circle_plonk_dsl_fields::M31Var;
     use circle_plonk_dsl_poseidon31::Poseidon2HalfStateRef;
+    use num_traits::One;
     use rand::rngs::SmallRng;
     use rand::{Rng, SeedableRng};
     use stwo_prover::core::fields::m31::M31;
+    use stwo_prover::core::fields::qm31::QM31;
+    use stwo_prover::core::fri::FriConfig;
+    use stwo_prover::core::pcs::PcsConfig;
     use stwo_prover::core::vcs::ops::MerkleHasher;
     use stwo_prover::core::vcs::poseidon31_hash::Poseidon31Hash;
-    use stwo_prover::core::vcs::poseidon31_merkle::Poseidon31MerkleHasher;
+    use stwo_prover::core::vcs::poseidon31_merkle::{
+        Poseidon31MerkleChannel, Poseidon31MerkleHasher,
+    };
+    use stwo_prover::examples::plonk_with_poseidon::air::{
+        prove_plonk_with_poseidon, verify_plonk_with_poseidon,
+    };
 
     #[test]
     fn test_consistency() {
@@ -195,10 +196,8 @@ mod test {
         let test_hash_column: [M31; 8] = prng.gen();
 
         let mut test_hash_left_var = Poseidon2HalfStateRef::new_witness(&cs, &test_hash_left);
-        let mut test_hash_right_var =
-            Poseidon2HalfStateRef::new_single_use_witness(&cs, &test_hash_right);
-        let mut test_hash_column_var =
-            Poseidon2HalfStateRef::new_single_use_witness(&cs, &test_hash_column);
+        let mut test_hash_right_var = Poseidon2HalfStateRef::new_witness(&cs, &test_hash_right);
+        let mut test_hash_column_var = Poseidon2HalfStateRef::new_witness(&cs, &test_hash_column);
 
         let a =
             Poseidon31MerkleHasherVar::hash_tree(&mut test_hash_left_var, &mut test_hash_right_var);
@@ -213,8 +212,7 @@ mod test {
             assert_eq!(a.value[i], b.0[i]);
         }
 
-        let mut test_hash_right_var =
-            Poseidon2HalfStateRef::new_single_use_witness(&cs, &test_hash_right);
+        let mut test_hash_right_var = Poseidon2HalfStateRef::new_witness(&cs, &test_hash_right);
 
         let mut a =
             Poseidon31MerkleHasherVar::hash_tree(&mut test_hash_left_var, &mut test_hash_right_var);
@@ -232,5 +230,29 @@ mod test {
         for i in 0..8 {
             assert_eq!(a.value[i], b.0[i]);
         }
+
+        let config = PcsConfig {
+            pow_bits: 20,
+            fri_config: FriConfig::new(0, 5, 16),
+        };
+
+        cs.pad();
+        cs.check_arithmetics();
+        cs.populate_logup_arguments();
+        cs.check_poseidon_invocations();
+
+        let (plonk, mut poseidon) = cs.generate_circuit();
+        let proof =
+            prove_plonk_with_poseidon::<Poseidon31MerkleChannel>(config, &plonk, &mut poseidon);
+        verify_plonk_with_poseidon::<Poseidon31MerkleChannel>(
+            proof,
+            config,
+            &[
+                (1, QM31::one()),
+                (2, QM31::from_u32_unchecked(0, 1, 0, 0)),
+                (3, QM31::from_u32_unchecked(0, 0, 1, 0)),
+            ],
+        )
+        .unwrap();
     }
 }

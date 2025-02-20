@@ -3,7 +3,7 @@ use circle_plonk_dsl_constraint_system::dvar::{AllocVar, AllocationMode, DVar};
 use circle_plonk_dsl_constraint_system::ConstraintSystemRef;
 use circle_plonk_dsl_fields::{M31Var, QM31Var};
 use num_traits::{One, Zero};
-use std::ops::Neg;
+use std::ops::{Add, Neg};
 use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::fields::qm31::QM31;
 use stwo_prover::examples::plonk_with_poseidon::poseidon::PoseidonEntry;
@@ -17,28 +17,10 @@ pub struct Poseidon2HalfStateRef {
     pub value: [M31; 8],
     pub left_variable: usize,
     pub right_variable: usize,
-    pub half_state_variable: usize,
-    pub addr_variable: usize,
-    pub disabled: bool,
+    pub sel_value: usize,
 }
 
 impl Poseidon2HalfStateRef {
-    pub fn is_allocated(&self) -> bool {
-        self.addr_variable != 0
-    }
-
-    pub fn new_single_use_witness(cs: &ConstraintSystemRef, value: &[M31; 8]) -> Self {
-        Self {
-            cs: cs.clone(),
-            value: *value,
-            left_variable: 0,
-            right_variable: 0,
-            half_state_variable: 0,
-            addr_variable: 0,
-            disabled: false,
-        }
-    }
-
     pub fn from_m31(slice: &[M31Var]) -> Self {
         assert_eq!(slice.len(), 8);
         let left_variable = QM31Var::from_m31(&slice[0], &slice[1], &slice[2], &slice[3]);
@@ -47,18 +29,14 @@ impl Poseidon2HalfStateRef {
         let cs = left_variable.cs().and(&right_variable.cs());
         let left_variable = left_variable.variable;
         let right_variable = right_variable.variable;
-
-        let half_state_variable = cs.mul(left_variable, right_variable);
-        let addr_variable = cs.new_m31(M31::from(half_state_variable), AllocationMode::Constant);
+        let sel_value = cs.assemble_poseidon_gate(left_variable, right_variable);
 
         Poseidon2HalfStateRef {
             cs,
             value: std::array::from_fn(|i| slice[i].value),
             left_variable,
             right_variable,
-            half_state_variable,
-            addr_variable,
-            disabled: false,
+            sel_value,
         }
     }
 
@@ -66,8 +44,7 @@ impl Poseidon2HalfStateRef {
         let cs = a.cs().and(&b.cs());
         let left_variable = a.variable;
         let right_variable = b.variable;
-        let half_state_variable = cs.mul(left_variable, right_variable);
-        let addr_variable = cs.new_m31(M31::from(half_state_variable), AllocationMode::Constant);
+        let half_state_variable = cs.assemble_poseidon_gate(left_variable, right_variable);
 
         let a_arr = a.value.to_m31_array();
         let b_arr = b.value.to_m31_array();
@@ -77,47 +54,80 @@ impl Poseidon2HalfStateRef {
             value: std::array::from_fn(|i| if i < 4 { a_arr[i] } else { b_arr[i - 4] }),
             left_variable,
             right_variable,
-            half_state_variable,
-            addr_variable,
-            disabled: false,
+            sel_value: half_state_variable,
         }
     }
 
-    pub fn swap_compress(
+    pub fn swap_permute(
         a0: &Poseidon2HalfStateRef,
         a1: &Poseidon2HalfStateRef,
         bit_value: bool,
         bit_variable: usize,
     ) -> Poseidon2HalfStateRef {
-        if a0.addr_variable == 0 {
-            assert!(!a0.disabled);
-        }
-        if a1.addr_variable == 0 {
-            assert!(!a1.disabled);
-        }
-
         let cs = a0.cs.and(&a1.cs);
-        let mut bit_variable_neg = cs.mul_constant(bit_variable, M31::one().neg());
-        bit_variable_neg = cs.add(1, bit_variable_neg);
+        let mut bit_variable_not = cs.mul_constant(bit_variable, M31::one().neg());
+        bit_variable_not = cs.add(1, bit_variable_not);
 
-        let t0 = cs.mul(a0.addr_variable, bit_variable_neg);
-        let t1 = cs.mul(a1.addr_variable, bit_variable);
-        let new_a0_addr_variable = cs.add(t0, t1);
+        let t0 = cs.mul(a0.left_variable, bit_variable_not);
+        let t1 = cs.mul(a1.left_variable, bit_variable);
+        let new_a0_left_variable = cs.add(t0, t1);
 
-        let t0 = cs.add(a0.addr_variable, a1.addr_variable);
-        let t1 = cs.mul_constant(new_a0_addr_variable, M31::one().neg());
-        let new_a1_addr_variable = cs.add(t0, t1);
+        let t0 = cs.mul(a0.right_variable, bit_variable_not);
+        let t1 = cs.mul(a1.right_variable, bit_variable);
+        let new_a0_right_variable = cs.add(t0, t1);
+
+        let new_a0_sel_value =
+            cs.assemble_poseidon_gate(new_a0_left_variable, new_a0_right_variable);
+
+        let t0 = cs.mul(a1.left_variable, bit_variable_not);
+        let t1 = cs.mul(a0.left_variable, bit_variable);
+        let new_a1_left_variable = cs.add(t0, t1);
+
+        let t0 = cs.mul(a1.right_variable, bit_variable_not);
+        let t1 = cs.mul(a0.right_variable, bit_variable);
+        let new_a1_right_variable = cs.add(t0, t1);
+
+        let new_a1_sel_value =
+            cs.assemble_poseidon_gate(new_a1_left_variable, new_a1_right_variable);
 
         let (mut left, mut right) = if !bit_value {
             (a0.clone(), a1.clone())
         } else {
             (a1.clone(), a0.clone())
         };
-        left.addr_variable = new_a0_addr_variable;
-        right.addr_variable = new_a1_addr_variable;
+        left.left_variable = new_a0_left_variable;
+        left.right_variable = new_a0_right_variable;
+        left.sel_value = new_a0_sel_value;
+
+        right.left_variable = new_a1_left_variable;
+        right.right_variable = new_a1_right_variable;
+        right.sel_value = new_a1_sel_value;
 
         let (digest, _) = Self::permute(&mut left, &mut right, false, true);
         digest
+    }
+}
+
+impl Add<&Poseidon2HalfStateRef> for &Poseidon2HalfStateRef {
+    type Output = Poseidon2HalfStateRef;
+
+    fn add(self, rhs: &Poseidon2HalfStateRef) -> Poseidon2HalfStateRef {
+        let cs = self.cs().and(&rhs.cs);
+
+        let value = std::array::from_fn(|i| self.value[i] + rhs.value[i]);
+
+        let left_variable = cs.add(self.left_variable, rhs.left_variable);
+        let right_variable = cs.add(self.right_variable, rhs.right_variable);
+
+        let sel_value = cs.assemble_poseidon_gate(left_variable, right_variable);
+
+        Poseidon2HalfStateRef {
+            cs,
+            value,
+            left_variable,
+            right_variable,
+            sel_value,
+        }
     }
 }
 
@@ -143,38 +153,30 @@ impl AllocVar for Poseidon2HalfStateRef {
             mode,
         )
         .variable;
-        let half_state_variable = cs.mul(left_variable, right_variable);
-        let addr_variable = cs.new_m31(M31::from(half_state_variable), AllocationMode::Constant);
+        let half_state_variable = cs.assemble_poseidon_gate(left_variable, right_variable);
 
         Self {
             cs: cs.clone(),
             value: *value,
             left_variable,
             right_variable,
-            half_state_variable,
-            addr_variable,
-            disabled: false,
+            sel_value: half_state_variable,
         }
     }
 }
 
 impl Poseidon2HalfStateRef {
     pub fn zero(cs: &ConstraintSystemRef) -> Self {
-        if let Some(addr_variable) = cs.get_cache("poseidon2 zero_half addr") {
+        if let Some(half_state_variable) = cs.get_cache("poseidon2 zero_half") {
             Self {
                 cs: cs.clone(),
                 value: [M31::zero(); 8],
                 left_variable: 0,
                 right_variable: 0,
-                half_state_variable: cs.get_cache("poseidon2 zero_half").unwrap(),
-                addr_variable,
-                disabled: false,
+                sel_value: half_state_variable,
             }
         } else {
-            let half_state_variable = cs.mul(0, 0);
-            let addr_variable =
-                cs.new_m31(M31::from(half_state_variable), AllocationMode::Constant);
-            cs.set_cache("poseidon2 zero_half addr", addr_variable);
+            let half_state_variable = cs.assemble_poseidon_gate(0, 0);
             cs.set_cache("poseidon2 zero_half", half_state_variable);
 
             Self {
@@ -182,15 +184,12 @@ impl Poseidon2HalfStateRef {
                 value: [M31::zero(); 8],
                 left_variable: 0,
                 right_variable: 0,
-                half_state_variable,
-                addr_variable,
-                disabled: false,
+                sel_value: half_state_variable,
             }
         }
     }
 
     pub fn to_qm31(&self) -> [QM31Var; 2] {
-        assert_ne!(self.addr_variable, 0);
         let cs = self.cs();
 
         [
@@ -215,16 +214,6 @@ impl Poseidon2HalfStateRef {
     ) -> (Poseidon2HalfStateRef, Poseidon2HalfStateRef) {
         let cs = left.cs().and(&right.cs());
 
-        if left.addr_variable == 0 {
-            assert!(!left.disabled);
-            left.disabled = true;
-        }
-
-        if right.addr_variable == 0 {
-            assert!(!right.disabled);
-            right.disabled = true;
-        }
-
         let mut state: [M31; 16] = std::array::from_fn(|i| {
             if i < 8 {
                 left.value[i]
@@ -235,19 +224,13 @@ impl Poseidon2HalfStateRef {
 
         poseidon2_permute(&mut state);
 
-        for i in 0..8 {
-            state[i] = state[i] + left.value[i];
-        }
-
-        let new_left = if ignore_left_result {
+        let mut new_left = if ignore_left_result {
             Poseidon2HalfStateRef {
                 cs: cs.clone(),
                 value: std::array::from_fn(|i| state[i]),
                 left_variable: 0,
                 right_variable: 0,
-                half_state_variable: 0,
-                addr_variable: 0,
-                disabled: true,
+                sel_value: 0,
             }
         } else {
             let left_variable =
@@ -256,18 +239,14 @@ impl Poseidon2HalfStateRef {
             let right_variable =
                 QM31Var::new_witness(&cs, &QM31::from_m31(state[4], state[5], state[6], state[7]))
                     .variable;
-            let half_state_variable = cs.mul(left_variable, right_variable);
-            let addr_variable =
-                cs.new_m31(M31::from(half_state_variable), AllocationMode::Constant);
+            let half_state_variable = cs.assemble_poseidon_gate(left_variable, right_variable);
 
             Poseidon2HalfStateRef {
                 cs: cs.clone(),
                 value: std::array::from_fn(|i| state[i]),
                 left_variable,
                 right_variable,
-                half_state_variable,
-                addr_variable,
-                disabled: false,
+                sel_value: half_state_variable,
             }
         };
 
@@ -277,9 +256,7 @@ impl Poseidon2HalfStateRef {
                 value: std::array::from_fn(|i| state[i + 8]),
                 left_variable: 0,
                 right_variable: 0,
-                half_state_variable: 0,
-                addr_variable: 0,
-                disabled: true,
+                sel_value: 0,
             }
         } else {
             let left_variable = QM31Var::new_witness(
@@ -292,43 +269,39 @@ impl Poseidon2HalfStateRef {
                 &QM31::from_m31(state[12], state[13], state[14], state[15]),
             )
             .variable;
-            let half_state_variable = cs.mul(left_variable, right_variable);
-            let addr_variable =
-                cs.new_m31(M31::from(half_state_variable), AllocationMode::Constant);
+            let half_state_variable = cs.assemble_poseidon_gate(left_variable, right_variable);
 
             Poseidon2HalfStateRef {
                 cs: cs.clone(),
                 value: std::array::from_fn(|i| state[i + 8]),
                 left_variable,
                 right_variable,
-                half_state_variable,
-                addr_variable,
-                disabled: false,
+                sel_value: half_state_variable,
             }
         };
 
         let entry_1 = PoseidonEntry {
-            addr: left.addr_variable,
-            sel: left.half_state_variable,
+            wire: left.sel_value,
             hash: left.value,
         };
         let entry_2 = PoseidonEntry {
-            addr: right.addr_variable,
-            sel: right.half_state_variable,
+            wire: right.sel_value,
             hash: right.value,
         };
         let entry_3 = PoseidonEntry {
-            addr: new_left.addr_variable,
-            sel: new_left.half_state_variable,
+            wire: new_left.sel_value,
             hash: new_left.value,
         };
         let entry_4 = PoseidonEntry {
-            addr: new_right.addr_variable,
-            sel: new_right.half_state_variable,
+            wire: new_right.sel_value,
             hash: new_right.value,
         };
 
         cs.invoke_poseidon_accelerator(entry_1, entry_2, entry_3, entry_4);
+
+        if !ignore_left_result {
+            new_left = &new_left + &left;
+        }
 
         (new_left, new_right)
     }

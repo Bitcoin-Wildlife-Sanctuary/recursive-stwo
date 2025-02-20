@@ -22,7 +22,7 @@ use stwo_prover::examples::plonk_with_poseidon::air::{
 
 fn main() {
     let proof: PlonkWithPoseidonProof<Poseidon31MerkleHasher> = bincode::deserialize(
-        include_bytes!("../../../components/test_data/recursive_proof_18_13.bin"),
+        include_bytes!("../../../components/test_data/small_proof.bin"),
     )
     .unwrap();
     let config = PcsConfig {
@@ -30,15 +30,7 @@ fn main() {
         fri_config: FriConfig::new(0, 5, 16),
     };
 
-    let fiat_shamir_hints = FiatShamirHints::new(
-        &proof,
-        config,
-        &[
-            (1, QM31::one()),
-            (2, QM31::from_u32_unchecked(0, 1, 0, 0)),
-            (3, QM31::from_u32_unchecked(0, 0, 1, 0)),
-        ],
-    );
+    let fiat_shamir_hints = FiatShamirHints::new(&proof, config, &[(1, QM31::one())]);
     let answer_hints = AnswerHints::compute(&fiat_shamir_hints, &proof);
     let decommitment_hints = DecommitHints::compute(&fiat_shamir_hints, &proof);
     let first_layer_hints = FirstLayerHints::compute(&fiat_shamir_hints, &answer_hints, &proof);
@@ -51,16 +43,15 @@ fn main() {
     let cs = ConstraintSystemRef::new_ref();
     let mut proof_var = PlonkWithPoseidonProofVar::new_witness(&cs, &proof);
 
+    println!("after allocating the proof: {}", cs.num_plonk_rows());
+
     let fiat_shamir_results = FiatShamirResults::compute(
         &fiat_shamir_hints,
         &mut proof_var,
         config,
-        &[
-            (1, QM31Var::one(&cs)),
-            (2, QM31Var::i(&cs)),
-            (3, QM31Var::j(&cs)),
-        ],
+        &[(1, QM31Var::one(&cs))],
     );
+    println!("after fiat-shamir: {}", cs.num_plonk_rows());
     CompositionCheck::compute(
         &fiat_shamir_hints,
         &fiat_shamir_results.lookup_elements,
@@ -68,6 +59,7 @@ fn main() {
         fiat_shamir_results.oods_point.clone(),
         &proof_var,
     );
+    println!("after composition: {}", cs.num_plonk_rows());
 
     let answer_results = AnswerResults::compute(
         &CirclePointQM31Var::new_witness(&cs, &fiat_shamir_hints.oods_point),
@@ -78,6 +70,7 @@ fn main() {
         &proof_var,
         config,
     );
+    println!("after answer: {}", cs.num_plonk_rows());
 
     FoldingResults::compute(
         &proof_var,
@@ -87,6 +80,7 @@ fn main() {
         &first_layer_hints,
         &inner_layer_hints,
     );
+    println!("after folding: {}", cs.num_plonk_rows());
 
     cs.pad();
     cs.check_arithmetics();
@@ -94,16 +88,10 @@ fn main() {
     cs.check_poseidon_invocations();
 
     let (plonk, mut poseidon) = cs.generate_circuit();
-    let proof = prove_plonk_with_poseidon::<Poseidon31MerkleChannel>(
-        plonk.mult_a.length.ilog2(),
-        poseidon.0.len().ilog2(),
-        config,
-        &plonk,
-        &mut poseidon,
-    );
+    let proof = prove_plonk_with_poseidon::<Poseidon31MerkleChannel>(config, &plonk, &mut poseidon);
 
     let path = format!(
-        "../components/test_data/recursive_proof_{}_{}.bin",
+        "../../components/test_data/recursive_proof_{}_{}.bin",
         proof.stmt0.log_size_plonk, proof.stmt0.log_size_poseidon
     );
     if !std::fs::exists(path.clone()).unwrap() {

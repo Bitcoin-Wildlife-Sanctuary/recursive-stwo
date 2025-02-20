@@ -24,7 +24,7 @@ impl FoldingResults {
         // allocate all the first layer merkle proofs
         let mut proofs = vec![];
         for (i, proof) in first_layer_hints.merkle_proofs.iter().enumerate() {
-            let mut proof = SinglePairMerkleProofVar::new_single_use_merkle_proof(&cs, proof);
+            let mut proof = SinglePairMerkleProofVar::new(&cs, proof);
             proof.verify(
                 &proof_var.stark_proof.fri_proof.first_layer_commitment,
                 &answer_results
@@ -87,8 +87,12 @@ impl FoldingResults {
                 let new_left_val = &left_val + &right_val;
                 let new_right_val = &(&left_val - &right_val) * &y_inv;
 
-                let folded_result =
-                    &new_left_val + &(&new_right_val * &fiat_shamir_results.fri_alphas[0]);
+                let folded_result = &new_left_val
+                    + &(&new_right_val
+                        * &fiat_shamir_results.fri_alphas[(fiat_shamir_hints
+                            .max_first_layer_column_log_size
+                            - log_size)
+                            as usize]);
 
                 folded_results_per_log_size.push(folded_result);
             }
@@ -138,10 +142,6 @@ impl FoldingResults {
             folded.push(QM31Var::zero(&cs));
         }
 
-        let mut fri_first_layer_alpha_squared = fiat_shamir_results.fri_alphas[0].clone();
-        fri_first_layer_alpha_squared =
-            &fri_first_layer_alpha_squared * &fri_first_layer_alpha_squared;
-
         let mut queries = answer_results
             .query_positions_per_log_size
             .get(&log_size)
@@ -155,8 +155,10 @@ impl FoldingResults {
             if let Some(folded_into) = folded_results.get(&log_size) {
                 assert_eq!(folded_into.len(), folded.len());
 
+                let mut fri_alpha = fiat_shamir_results.fri_alphas[i].clone();
+                fri_alpha = &fri_alpha * &fri_alpha;
                 for (v, b) in folded.iter_mut().zip(folded_into.iter()) {
-                    *v = &(&fri_first_layer_alpha_squared * (v as &QM31Var)) + b;
+                    *v = &(&fri_alpha * (v as &QM31Var)) + b;
                 }
             }
 
@@ -170,8 +172,7 @@ impl FoldingResults {
             for ((folded_result, query), proof) in
                 folded.iter().zip(queries.iter()).zip(merkle_proofs.iter())
             {
-                let mut merkle_proof =
-                    SinglePairMerkleProofVar::new_single_use_merkle_proof(&cs, proof);
+                let mut merkle_proof = SinglePairMerkleProofVar::new(&cs, proof);
 
                 let self_val = merkle_proof.self_columns.get(&(log_size as usize)).unwrap();
                 let sibling_val = merkle_proof
@@ -247,6 +248,13 @@ mod test {
             fri_config: FriConfig::new(0, 5, 16),
         };
 
+        verify_plonk_with_poseidon::<Poseidon31MerkleChannel>(
+            proof.clone(),
+            config,
+            &[(1, QM31::one())],
+        )
+        .unwrap();
+
         let fiat_shamir_hints = FiatShamirHints::new(&proof, config, &[(1, QM31::one())]);
         let answer_hints = AnswerHints::compute(&fiat_shamir_hints, &proof);
         let fri_answer_hints = AnswerHints::compute(&fiat_shamir_hints, &proof);
@@ -293,13 +301,8 @@ mod test {
         cs.check_poseidon_invocations();
 
         let (plonk, mut poseidon) = cs.generate_circuit();
-        let proof = prove_plonk_with_poseidon::<Poseidon31MerkleChannel>(
-            plonk.mult_a.length.ilog2(),
-            poseidon.0.len().ilog2(),
-            config,
-            &plonk,
-            &mut poseidon,
-        );
+        let proof =
+            prove_plonk_with_poseidon::<Poseidon31MerkleChannel>(config, &plonk, &mut poseidon);
         verify_plonk_with_poseidon::<Poseidon31MerkleChannel>(
             proof,
             config,

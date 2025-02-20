@@ -281,13 +281,10 @@ impl DVar for SinglePathMerkleProofVar {
 }
 
 impl SinglePathMerkleProofVar {
-    pub fn new_single_use_merkle_proof(
-        cs: &ConstraintSystemRef,
-        value: &SinglePathMerkleProof,
-    ) -> Self {
+    pub fn new(cs: &ConstraintSystemRef, value: &SinglePathMerkleProof) -> Self {
         let mut sibling_hashes = vec![];
         for sibling_hash in value.sibling_hashes.iter() {
-            sibling_hashes.push(HashVar::new_single_use_witness(&cs, &sibling_hash.0));
+            sibling_hashes.push(HashVar::new_witness(&cs, &sibling_hash.0));
         }
 
         let mut columns = BTreeMap::new();
@@ -345,6 +342,8 @@ impl SinglePathMerkleProofVar {
             }
         }
 
+        assert_eq!(cur_hash.value, root.value);
+
         // check that the left_variable and right_variable are the same
         // as though in self.root
         let cs = self.cs().and(&root.cs()).and(&query.cs());
@@ -371,13 +370,10 @@ impl DVar for SinglePairMerkleProofVar {
 }
 
 impl SinglePairMerkleProofVar {
-    pub fn new_single_use_merkle_proof(
-        cs: &ConstraintSystemRef,
-        value: &SinglePairMerkleProof,
-    ) -> Self {
+    pub fn new(cs: &ConstraintSystemRef, value: &SinglePairMerkleProof) -> Self {
         let mut sibling_hashes = vec![];
         for sibling_hash in value.sibling_hashes.iter() {
-            sibling_hashes.push(HashVar::new_single_use_witness(&cs, &sibling_hash.0));
+            sibling_hashes.push(HashVar::new_witness(&cs, &sibling_hash.0));
         }
 
         let mut self_columns = BTreeMap::new();
@@ -484,33 +480,25 @@ impl DVar for DecommitmentVar {
 }
 
 impl DecommitmentVar {
-    pub fn new_single_use(cs: &ConstraintSystemRef, value: &DecommitHints) -> Self {
+    pub fn new(cs: &ConstraintSystemRef, value: &DecommitHints) -> Self {
         let mut precomputed_proofs = vec![];
         for proof in value.precomputed_proofs.iter() {
-            precomputed_proofs.push(SinglePathMerkleProofVar::new_single_use_merkle_proof(
-                cs, proof,
-            ));
+            precomputed_proofs.push(SinglePathMerkleProofVar::new(cs, proof));
         }
 
         let mut trace_proofs = vec![];
         for proof in value.trace_proofs.iter() {
-            trace_proofs.push(SinglePathMerkleProofVar::new_single_use_merkle_proof(
-                cs, proof,
-            ));
+            trace_proofs.push(SinglePathMerkleProofVar::new(cs, proof));
         }
 
         let mut interaction_proofs = vec![];
         for proof in value.interaction_proofs.iter() {
-            interaction_proofs.push(SinglePathMerkleProofVar::new_single_use_merkle_proof(
-                cs, proof,
-            ));
+            interaction_proofs.push(SinglePathMerkleProofVar::new(cs, proof));
         }
 
         let mut composition_proofs = vec![];
         for proof in value.composition_proofs.iter() {
-            composition_proofs.push(SinglePathMerkleProofVar::new_single_use_merkle_proof(
-                cs, proof,
-            ));
+            composition_proofs.push(SinglePathMerkleProofVar::new(cs, proof));
         }
 
         Self {
@@ -575,7 +563,7 @@ mod test {
         let cs = ConstraintSystemRef::new_ref();
         let root = HashVar::new_witness(&cs, &proof.stark_proof.commitments[0].0);
         for proof in proofs.iter() {
-            let mut proof_var = SinglePathMerkleProofVar::new_single_use_merkle_proof(&cs, proof);
+            let mut proof_var = SinglePathMerkleProofVar::new(&cs, proof);
             let query = M31Var::new_witness(&cs, &M31::from(proof.query));
             let query_bits = BitsVar::from_m31(&query, proof.depth);
             proof_var.verify(&root, &query_bits);
@@ -601,7 +589,7 @@ mod test {
         let cs = ConstraintSystemRef::new_ref();
         let root = HashVar::new_witness(&cs, &proof.stark_proof.fri_proof.first_layer.commitment.0);
         for proof in first_layer_hints.merkle_proofs.iter() {
-            let mut proof_var = SinglePairMerkleProofVar::new_single_use_merkle_proof(&cs, proof);
+            let mut proof_var = SinglePairMerkleProofVar::new(&cs, proof);
             let query = M31Var::new_witness(&cs, &M31::from(proof.query));
             let query_bits = BitsVar::from_m31(&query, proof.depth);
             proof_var.verify(&root, &query_bits);

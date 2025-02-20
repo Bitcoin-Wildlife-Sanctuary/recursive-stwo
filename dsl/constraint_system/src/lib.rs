@@ -103,6 +103,10 @@ impl ConstraintSystemRef {
     pub fn num_plonk_rows(&self) -> usize {
         self.0.borrow().a_wire.len()
     }
+
+    pub fn assemble_poseidon_gate(&self, a_wire: usize, b_wire: usize) -> usize {
+        self.0.borrow_mut().assemble_poseidon_gate(a_wire, b_wire)
+    }
 }
 
 #[derive(Debug)]
@@ -110,6 +114,8 @@ pub struct ConstraintSystem {
     pub variables: Vec<QM31>,
 
     pub cache: HashMap<String, usize>,
+
+    pub poseidon_wire: Vec<usize>,
 
     pub a_wire: Vec<usize>,
     pub b_wire: Vec<usize>,
@@ -145,6 +151,7 @@ impl ConstraintSystem {
             a_wire: Vec::with_capacity(1 << LOG_CONSTRAINT_SYSTEM_RESERVED_SIZE),
             b_wire: Vec::with_capacity(1 << LOG_CONSTRAINT_SYSTEM_RESERVED_SIZE),
             c_wire: Vec::with_capacity(1 << LOG_CONSTRAINT_SYSTEM_RESERVED_SIZE),
+            poseidon_wire: Vec::with_capacity(1 << LOG_CONSTRAINT_SYSTEM_RESERVED_SIZE),
             mult_a: vec![],
             mult_b: vec![],
             mult_c: vec![],
@@ -164,24 +171,28 @@ impl ConstraintSystem {
         cs.a_wire.push(0);
         cs.b_wire.push(0);
         cs.c_wire.push(0);
+        cs.poseidon_wire.push(0);
         cs.enforce_c_m31.push(0);
         cs.op.push(M31::one());
 
         cs.a_wire.push(1);
         cs.b_wire.push(0);
         cs.c_wire.push(1);
+        cs.poseidon_wire.push(0);
         cs.enforce_c_m31.push(0);
         cs.op.push(M31::one());
 
         cs.a_wire.push(2);
         cs.b_wire.push(0);
         cs.c_wire.push(2);
+        cs.poseidon_wire.push(0);
         cs.enforce_c_m31.push(0);
         cs.op.push(M31::one());
 
         cs.a_wire.push(3);
         cs.b_wire.push(0);
         cs.c_wire.push(3);
+        cs.poseidon_wire.push(0);
         cs.enforce_c_m31.push(0);
         cs.op.push(M31::one());
 
@@ -197,17 +208,13 @@ impl ConstraintSystem {
         self.a_wire.push(a_wire);
         self.b_wire.push(b_wire);
         self.c_wire.push(c_wire);
+        self.poseidon_wire.push(0);
         self.enforce_c_m31.push(0);
         self.op.push(op);
 
         assert!(a_wire < id);
         assert!(b_wire < id);
         assert!(c_wire < id);
-
-        self.variables.push(
-            (self.variables[a_wire] + self.variables[b_wire]) * op
-                + self.variables[a_wire] * self.variables[b_wire] * (M31::one() - op),
-        );
     }
 
     pub fn invoke_poseidon_accelerator(
@@ -226,6 +233,7 @@ impl ConstraintSystem {
         self.a_wire.push(var);
         self.b_wire.push(0);
         self.c_wire.push(0);
+        self.poseidon_wire.push(0);
         self.enforce_c_m31.push(0);
         self.op.push(M31::one());
     }
@@ -239,6 +247,27 @@ impl ConstraintSystem {
 
         self.insert_gate(a_wire, b_wire, c_wire, M31::one());
         c_wire
+    }
+
+    pub fn assemble_poseidon_gate(&mut self, a_wire: usize, b_wire: usize) -> usize {
+        let a_val = self.variables[a_wire];
+        let b_val = self.variables[b_wire];
+
+        let c_wire = self.variables.len();
+        self.variables.push(a_val * b_val);
+
+        self.is_program_started = true;
+
+        let poseidon_wire = self.poseidon_wire.len() + 1;
+
+        self.a_wire.push(a_wire);
+        self.b_wire.push(b_wire);
+        self.c_wire.push(c_wire);
+        self.poseidon_wire.push(poseidon_wire);
+        self.enforce_c_m31.push(0);
+        self.op.push(M31::zero());
+
+        poseidon_wire
     }
 
     pub fn mul(&mut self, a_wire: usize, b_wire: usize) -> usize {
@@ -273,6 +302,7 @@ impl ConstraintSystem {
                 self.a_wire.push(c_wire);
                 self.b_wire.push(0);
                 self.c_wire.push(c_wire);
+                self.poseidon_wire.push(0);
                 self.enforce_c_m31.push(1);
                 self.op.push(M31::one());
 
@@ -284,6 +314,7 @@ impl ConstraintSystem {
                 self.a_wire.push(c_wire);
                 self.b_wire.push(0);
                 self.c_wire.push(c_wire);
+                self.poseidon_wire.push(0);
                 self.enforce_c_m31.push(1);
                 self.op.push(M31::one());
             }
@@ -293,6 +324,7 @@ impl ConstraintSystem {
                 self.a_wire.push(1);
                 self.b_wire.push(0);
                 self.c_wire.push(c_wire);
+                self.poseidon_wire.push(0);
                 self.enforce_c_m31.push(0);
                 self.op.push(variable);
             }
@@ -312,6 +344,7 @@ impl ConstraintSystem {
                 self.a_wire.push(c_wire);
                 self.b_wire.push(0);
                 self.c_wire.push(c_wire);
+                self.poseidon_wire.push(0);
                 self.enforce_c_m31.push(1);
                 self.op.push(M31::one());
 
@@ -338,6 +371,7 @@ impl ConstraintSystem {
                 self.a_wire.push(a_wire);
                 self.b_wire.push(b_wire);
                 self.c_wire.push(c_wire);
+                self.poseidon_wire.push(0);
                 self.enforce_c_m31.push(0);
                 self.op.push(M31::one());
             }
@@ -366,23 +400,19 @@ impl ConstraintSystem {
             for _ in poseidon_len..padded_poseidon_len {
                 self.invoke_poseidon_accelerator(
                     PoseidonEntry {
-                        addr: 0,
-                        sel: 0,
+                        wire: 0,
                         hash: CONSTANT_1,
                     },
                     PoseidonEntry {
-                        addr: 0,
-                        sel: 0,
+                        wire: 0,
                         hash: CONSTANT_1,
                     },
                     PoseidonEntry {
-                        addr: 0,
-                        sel: 0,
+                        wire: 0,
                         hash: CONSTANT_2,
                     },
                     PoseidonEntry {
-                        addr: 0,
-                        sel: 0,
+                        wire: 0,
                         hash: CONSTANT_3,
                     },
                 );
@@ -397,6 +427,7 @@ impl ConstraintSystem {
             self.a_wire.push(0);
             self.b_wire.push(0);
             self.c_wire.push(0);
+            self.poseidon_wire.push(0);
             self.enforce_c_m31.push(0);
             self.op.push(M31::one());
         }
@@ -410,6 +441,7 @@ impl ConstraintSystem {
 
         assert_eq!(self.a_wire.len(), self.b_wire.len());
         assert_eq!(self.a_wire.len(), self.c_wire.len());
+        assert_eq!(self.a_wire.len(), self.poseidon_wire.len());
         assert_eq!(self.a_wire.len(), self.op.len());
         assert_eq!(self.a_wire.len(), self.enforce_c_m31.len());
 
@@ -470,13 +502,6 @@ impl ConstraintSystem {
             counts[i + 1] += 1;
         }
 
-        for (r1, r2, r3, r4) in self.flow.0.iter() {
-            counts[r1.addr] += 1;
-            counts[r2.addr] += 1;
-            counts[r3.addr] += 1;
-            counts[r4.addr] += 1;
-        }
-
         let mut first_occurred = vec![false; n_vars];
         let mut mult_a = Vec::with_capacity(n_rows);
         let mut mult_b = Vec::with_capacity(n_rows);
@@ -510,25 +535,19 @@ impl ConstraintSystem {
 
         let mut mult_poseidon_vars = vec![0; n_vars];
         for (r1, r2, r3, r4) in self.flow.0.iter() {
-            mult_poseidon_vars[r1.sel] += 1;
-            mult_poseidon_vars[r2.sel] += 1;
-            mult_poseidon_vars[r3.sel] += 1;
-            mult_poseidon_vars[r4.sel] += 1;
+            mult_poseidon_vars[r1.wire] += 1;
+            mult_poseidon_vars[r2.wire] += 1;
+            mult_poseidon_vars[r3.wire] += 1;
+            mult_poseidon_vars[r4.wire] += 1;
         }
         mult_poseidon_vars[0] = 0;
 
-        for i in 0..n_vars {
-            if mult_poseidon_vars[i] != 0 {
-                assert_eq!(counts[i], 1, "gate {} is not supposed to be reused", i);
-            }
-        }
-
         let mut mult_poseidon = Vec::with_capacity(n_rows);
         for i in 0..n_rows {
-            let r = mult_poseidon_vars[self.c_wire[i]];
+            let r = mult_poseidon_vars[self.poseidon_wire[i]];
             if r != 0 {
                 mult_poseidon.push(r);
-                mult_poseidon_vars[self.c_wire[i]] = 0;
+                mult_poseidon_vars[self.poseidon_wire[i]] = 0;
             } else {
                 mult_poseidon.push(0);
             }
@@ -548,41 +567,24 @@ impl ConstraintSystem {
                 let l = self.variables[self.a_wire[i]].to_m31_array();
                 let r = self.variables[self.b_wire[i]].to_m31_array();
                 map.insert(
-                    self.c_wire[i],
+                    self.poseidon_wire[i],
                     [l[0], l[1], l[2], l[3], r[0], r[1], r[2], r[3]],
                 );
             }
         }
 
         for (r1, r2, r3, r4) in self.flow.0.iter() {
-            assert_eq!(r1.sel, self.variables[r1.addr].0 .0 .0 as usize);
-            assert_eq!(r2.sel, self.variables[r2.addr].0 .0 .0 as usize);
-            assert_eq!(r3.sel, self.variables[r3.addr].0 .0 .0 as usize);
-            assert_eq!(r4.sel, self.variables[r4.addr].0 .0 .0 as usize);
-
-            if r1.sel != 0 {
-                assert_eq!(
-                    *map.get(&r1.sel).unwrap(),
-                    r1.hash,
-                    "error at {} {} {} {} -- {} {} {} {}",
-                    r1.addr,
-                    r2.addr,
-                    r3.addr,
-                    r4.addr,
-                    r1.sel,
-                    r2.sel,
-                    r3.sel,
-                    r4.sel
-                );
+            if r1.wire != 0 {
+                assert_eq!(*map.get(&r1.wire).unwrap(), r1.hash,);
             }
-            if r2.sel != 0 {
-                assert_eq!(*map.get(&r2.sel).unwrap(), r2.hash);
+            if r2.wire != 0 {
+                assert_eq!(*map.get(&r2.wire).unwrap(), r2.hash);
             }
-            if r3.sel != 0 {
-                assert_eq!(*map.get(&r3.sel).unwrap(), r3.hash);
+            if r3.wire != 0 {
+                assert_eq!(*map.get(&r3.wire).unwrap(), r3.hash);
             }
-            if r4.sel != 0 {
-                assert_eq!(*map.get(&r4.sel).unwrap(), r4.hash);
+            if r4.wire != 0 {
+                assert_eq!(*map.get(&r4.wire).unwrap(), r4.hash);
             }
 
             let mut state: [M31; 16] = [
@@ -590,19 +592,13 @@ impl ConstraintSystem {
                 r1.hash[7], r2.hash[0], r2.hash[1], r2.hash[2], r2.hash[3], r2.hash[4], r2.hash[5],
                 r2.hash[6], r2.hash[7],
             ];
-
-            let initial_state = state.clone();
-
             let expected: [M31; 16] = [
                 r3.hash[0], r3.hash[1], r3.hash[2], r3.hash[3], r3.hash[4], r3.hash[5], r3.hash[6],
                 r3.hash[7], r4.hash[0], r4.hash[1], r4.hash[2], r4.hash[3], r4.hash[4], r4.hash[5],
                 r4.hash[6], r4.hash[7],
             ];
             poseidon2_permute(&mut state);
-            for i in 0..8 {
-                assert_eq!(expected[i], state[i] + initial_state[i]);
-            }
-            for i in 8..16 {
+            for i in 0..16 {
                 assert_eq!(expected[i], state[i]);
             }
         }
@@ -614,6 +610,7 @@ impl ConstraintSystem {
         assert!(!self.mult_a.is_empty());
         assert!(!self.mult_b.is_empty());
         assert!(!self.mult_c.is_empty());
+        assert!(!self.poseidon_wire.is_empty());
         assert!(!self.mult_poseidon.is_empty());
 
         let log_n_rows = self.a_wire.len().ilog2();
@@ -638,6 +635,10 @@ impl ConstraintSystem {
             mult_c: range
                 .clone()
                 .map(|i| isize_to_m31(self.mult_c[i]))
+                .collect(),
+            poseidon_wire: range
+                .clone()
+                .map(|i| self.poseidon_wire[i].into())
                 .collect(),
             mult_poseidon: range
                 .clone()

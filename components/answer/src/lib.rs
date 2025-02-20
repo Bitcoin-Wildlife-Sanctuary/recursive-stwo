@@ -97,7 +97,7 @@ impl AnswerResults {
                     .collect_vec()
             });
         mask_points_poseidon[PREPROCESSED_TRACE_IDX] =
-            vec![vec![(ShiftIndex::Zero, oods_point.clone())]; 5];
+            vec![vec![(ShiftIndex::Zero, oods_point.clone())]; 25];
 
         assert_eq!(
             mask_points_plonk.len(),
@@ -222,7 +222,7 @@ impl AnswerResults {
             );
         }
 
-        let mut decommitment_var = DecommitmentVar::new_single_use(&cs, &decommit_hints);
+        let mut decommitment_var = DecommitmentVar::new(&cs, &decommit_hints);
         for (i, query) in query_positions_per_log_size[&(*fiat_shamir_hints.trees_log_sizes[0]
             .iter()
             .max()
@@ -234,6 +234,7 @@ impl AnswerResults {
             decommitment_var.precomputed_proofs[i]
                 .verify(&fiat_shamir_results.preprocessed_commitment, query);
         }
+
         for (i, query) in query_positions_per_log_size[&(*fiat_shamir_hints.trees_log_sizes[1]
             .iter()
             .max()
@@ -453,13 +454,8 @@ mod test {
         cs.check_poseidon_invocations();
 
         let (plonk, mut poseidon) = cs.generate_circuit();
-        let proof = prove_plonk_with_poseidon::<Poseidon31MerkleChannel>(
-            plonk.mult_a.length.ilog2(),
-            poseidon.0.len().ilog2(),
-            config,
-            &plonk,
-            &mut poseidon,
-        );
+        let proof =
+            prove_plonk_with_poseidon::<Poseidon31MerkleChannel>(config, &plonk, &mut poseidon);
         verify_plonk_with_poseidon::<Poseidon31MerkleChannel>(
             proof,
             config,

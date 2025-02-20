@@ -50,7 +50,13 @@ impl CompositionCheck {
             *plonk_prepared_column_indices,
             vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
         );
-        assert_eq!(*poseidon_prepared_column_indices, vec![10, 11, 12, 13, 14]);
+        assert_eq!(
+            *poseidon_prepared_column_indices,
+            vec![
+                10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30,
+                31, 32, 33, 34
+            ]
+        );
 
         let mut evaluation_accumulator = PointEvaluationAccumulatorVar::new(random_coeff);
 
@@ -166,13 +172,8 @@ mod test {
         cs.check_poseidon_invocations();
 
         let (plonk, mut poseidon) = cs.generate_circuit();
-        let proof = prove_plonk_with_poseidon::<Poseidon31MerkleChannel>(
-            plonk.mult_a.length.ilog2(),
-            poseidon.0.len().ilog2(),
-            config,
-            &plonk,
-            &mut poseidon,
-        );
+        let proof =
+            prove_plonk_with_poseidon::<Poseidon31MerkleChannel>(config, &plonk, &mut poseidon);
         verify_plonk_with_poseidon::<Poseidon31MerkleChannel>(
             proof,
             config,

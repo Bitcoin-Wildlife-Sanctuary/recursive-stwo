@@ -1,17 +1,11 @@
 use crate::data_structures::{EvalAtRowVar, RelationEntryVar};
-use circle_plonk_dsl_constraint_system::dvar::{AllocVar, DVar};
+use circle_plonk_dsl_constraint_system::dvar::DVar;
 use circle_plonk_dsl_data_structures::PlonkWithAcceleratorLookupElementsVar;
-use circle_plonk_dsl_fields::{M31Var, QM31Var};
-use std::ops::Add;
-use stwo_prover::constraint_framework::preprocessed_columns::PreprocessedColumn;
+use circle_plonk_dsl_fields::QM31Var;
 use stwo_prover::core::fields::m31::M31;
-use stwo_prover::core::vcs::poseidon31_ref::{
-    FIRST_FOUR_ROUND_RC, LAST_FOUR_ROUNDS_RC, PARTIAL_ROUNDS_RC,
-};
+use stwo_prover::examples::plonk_with_poseidon::poseidon::Poseidon;
 
 const N_STATE: usize = 16;
-const N_HALF_FULL_ROUNDS: usize = 4;
-const N_PARTIAL_ROUNDS: usize = 14;
 
 #[inline(always)]
 /// Applies the M4 MDS matrix described in <https://eprint.iacr.org/2023/323.pdf> 5.1.
@@ -82,187 +76,161 @@ pub fn evaluate_poseidon<'a>(
 ) -> EvalAtRowVar<'a> {
     let cs = lookup_elements.cs();
 
-    let addr_1 = eval.get_preprocessed_column(PreprocessedColumn::Poseidon(0));
-    let addr_2 = eval.get_preprocessed_column(PreprocessedColumn::Poseidon(1));
-    let addr_3 = eval.get_preprocessed_column(PreprocessedColumn::Poseidon(2));
-    let addr_4 = eval.get_preprocessed_column(PreprocessedColumn::Poseidon(3));
+    let is_first_round =
+        eval.get_preprocessed_column(Poseidon::new("is_first_round".to_string()).id());
+    let is_last_round =
+        eval.get_preprocessed_column(Poseidon::new("is_last_round".to_string()).id());
+    let is_full_round =
+        eval.get_preprocessed_column(Poseidon::new("is_full_round".to_string()).id());
+    let is_partial_round =
+        eval.get_preprocessed_column(Poseidon::new("is_partial_round".to_string()).id());
 
-    let sel_1 = eval.next_trace_mask();
-    let sel_2 = eval.next_trace_mask();
-    let sel_3 = eval.next_trace_mask();
-    let sel_4 = eval.next_trace_mask();
+    let one = QM31Var::one(&cs);
 
-    let sel_1_inv = eval.next_trace_mask();
-    let sel_2_inv = eval.next_trace_mask();
-    let sel_3_inv = eval.next_trace_mask();
-    let sel_4_inv = eval.next_trace_mask();
+    let is_not_first_round = &one - &is_first_round;
+    let is_not_last_round = &one - &is_last_round;
 
-    let is_sel_1_nonzero = &sel_1 * &sel_1_inv;
-    let is_sel_2_nonzero = &sel_2 * &sel_2_inv;
-    let is_sel_3_nonzero = &sel_3 * &sel_3_inv;
-    let is_sel_4_nonzero = &sel_4 * &sel_4_inv;
+    let round_id = eval.get_preprocessed_column(Poseidon::new("round_id".to_string()).id());
 
-    eval.add_constraint(&(-&is_sel_1_nonzero).add(&M31Var::one(&cs)) * &sel_1);
-    eval.add_constraint(&(-&is_sel_2_nonzero).add(&M31Var::one(&cs)) * &sel_2);
-    eval.add_constraint(&(-&is_sel_3_nonzero).add(&M31Var::one(&cs)) * &sel_3);
-    eval.add_constraint(&(-&is_sel_4_nonzero).add(&M31Var::one(&cs)) * &sel_4);
-
-    let mut state: [_; 16] = std::array::from_fn(|_| eval.next_trace_mask());
-
-    // Require state lookup.
-    let initial_state = state.clone();
-
-    apply_external_round_matrix(&mut state);
-
-    // 4 full rounds.
-    (0..N_HALF_FULL_ROUNDS).for_each(|round| {
-        (0..N_STATE).for_each(|i| {
-            state[i] = &state[i] + &M31Var::new_constant(&cs, &FIRST_FOUR_ROUND_RC[round][i]);
-        });
-        state = std::array::from_fn(|i| pow5(state[i].clone()));
-        apply_external_round_matrix(&mut state);
-        state.iter_mut().for_each(|s| {
-            let m = eval.next_trace_mask();
-            eval.add_constraint((s as &QM31Var) - &m);
-            *s = m;
-        });
-    });
-
-    // Partial rounds.
-    (0..N_PARTIAL_ROUNDS).for_each(|round| {
-        state[0] = &state[0] + &M31Var::new_constant(&cs, &PARTIAL_ROUNDS_RC[round]);
-        state[0] = pow5(state[0].clone());
-
-        let m = eval.next_trace_mask();
-        eval.add_constraint(&state[0] - &m);
-        state[0] = m;
-
-        apply_internal_round_matrix(&mut state);
-    });
-
-    // 4 full rounds.
-    (0..N_HALF_FULL_ROUNDS - 1).for_each(|round| {
-        (0..N_STATE).for_each(|i| {
-            state[i] = &state[i] + &M31Var::new_constant(&cs, &LAST_FOUR_ROUNDS_RC[round][i]);
-        });
-        state = std::array::from_fn(|i| pow5(state[i].clone()));
-        apply_external_round_matrix(&mut state);
-        state.iter_mut().for_each(|s| {
-            let m = eval.next_trace_mask();
-            eval.add_constraint((s as &QM31Var) - &m);
-            *s = m;
-        })
-    });
-
-    // the last full round
-    {
-        (0..N_STATE).for_each(|i| {
-            state[i] = &state[i] + &M31Var::new_constant(&cs, &LAST_FOUR_ROUNDS_RC[3][i]);
-        });
-        state = std::array::from_fn(|i| pow5(state[i].clone()));
-        apply_external_round_matrix(&mut state);
-        state
-            .iter_mut()
-            .zip(initial_state.iter())
-            .take(8)
-            .for_each(|(s, i)| {
-                let m = eval.next_trace_mask();
-                eval.add_constraint(&(&m - (&s as &QM31Var)) - i);
-                *s = m;
-            });
-
-        state.iter_mut().skip(8).for_each(|s| {
-            let m = eval.next_trace_mask();
-            eval.add_constraint((s as &QM31Var) - &m);
-            *s = m;
-        })
+    let mut rc = vec![];
+    for i in 0..16 {
+        rc.push(eval.get_preprocessed_column(Poseidon::new(format!("rc {}", i).to_string()).id()));
     }
 
-    eval.add_to_relation(RelationEntryVar::new(
-        lookup_elements,
-        QM31Var::one(&cs),
-        &[addr_1, sel_1.clone()],
-    ));
+    let external_idx_1 =
+        eval.get_preprocessed_column(Poseidon::new("external_idx_1".to_string()).id());
+    let external_idx_2 =
+        eval.get_preprocessed_column(Poseidon::new("external_idx_2".to_string()).id());
+    let is_external_idx_1_nonzero =
+        eval.get_preprocessed_column(Poseidon::new("is_external_idx_1_nonzero".to_string()).id());
+    let is_external_idx_2_nonzero =
+        eval.get_preprocessed_column(Poseidon::new("is_external_idx_2_nonzero".to_string()).id());
 
-    eval.add_to_relation(RelationEntryVar::new(
-        lookup_elements,
-        QM31Var::one(&cs),
-        &[addr_2, sel_2.clone()],
-    ));
+    let in_state: [_; N_STATE] = std::array::from_fn(|_| eval.next_trace_mask());
+    let out_state: [_; N_STATE] = std::array::from_fn(|_| eval.next_trace_mask());
 
-    eval.add_to_relation(RelationEntryVar::new(
-        lookup_elements,
-        QM31Var::one(&cs),
-        &[addr_3, sel_3.clone()],
-    ));
+    // if this is first round
+    let mut permuted_state = in_state.clone();
+    apply_external_round_matrix(&mut permuted_state);
+    (0..N_STATE).for_each(|i| {
+        eval.add_constraint(&is_first_round * &(&out_state[i] - &permuted_state[i]));
+    });
 
-    eval.add_to_relation(RelationEntryVar::new(
-        lookup_elements,
-        QM31Var::one(&cs),
-        &[addr_4, sel_4.clone()],
-    ));
+    // if this is a full round
+    let mut full_round_state = in_state.clone();
+    (0..N_STATE).for_each(|i| {
+        full_round_state[i] = &full_round_state[i] + &rc[i];
+    });
+    full_round_state = std::array::from_fn(|i| pow5(full_round_state[i].clone()));
+    apply_external_round_matrix(&mut full_round_state);
+    (0..N_STATE).for_each(|i| {
+        eval.add_constraint(&is_full_round * &(&out_state[i] - &full_round_state[i]));
+    });
 
+    // if this is a partial round
+    let mut partial_round_state = in_state.clone();
+    partial_round_state[0] = &partial_round_state[0] + &rc[0];
+    partial_round_state[0] = pow5(partial_round_state[0].clone());
+    apply_internal_round_matrix(&mut partial_round_state);
+    (0..N_STATE).for_each(|i| {
+        eval.add_constraint(&is_partial_round * &(&out_state[i] - &partial_round_state[i]));
+    });
+
+    // in_state with id
+    let in_left_id = &round_id + &round_id;
+    let in_right_id = &in_left_id + &one;
+    let out_left_id = &in_right_id + &one;
+    let out_right_id = &out_left_id + &one;
+
+    let sel = &is_external_idx_1_nonzero * &is_first_round;
+    let id = {
+        let v = &(&is_first_round * &external_idx_1) + &(&is_not_first_round * &in_left_id);
+        let t = eval.next_trace_mask();
+        eval.add_constraint(&v - &t);
+        t
+    };
     eval.add_to_relation(RelationEntryVar::new(
         lookup_elements,
-        is_sel_1_nonzero,
+        &sel - &is_not_first_round,
         &[
-            -&sel_1,
-            initial_state[0].clone(),
-            initial_state[1].clone(),
-            initial_state[2].clone(),
-            initial_state[3].clone(),
-            initial_state[4].clone(),
-            initial_state[5].clone(),
-            initial_state[6].clone(),
-            initial_state[7].clone(),
+            id,
+            in_state[0].clone(),
+            in_state[1].clone(),
+            in_state[2].clone(),
+            in_state[3].clone(),
+            in_state[4].clone(),
+            in_state[5].clone(),
+            in_state[6].clone(),
+            in_state[7].clone(),
         ],
     ));
 
+    let sel = &is_external_idx_2_nonzero * &is_first_round;
+    let id = {
+        let v = &(&is_first_round * &external_idx_2) + &(&is_not_first_round * &in_right_id);
+        let t = eval.next_trace_mask();
+        eval.add_constraint(&v - &t);
+        t
+    };
     eval.add_to_relation(RelationEntryVar::new(
         lookup_elements,
-        is_sel_2_nonzero,
+        &sel - &is_not_first_round,
         &[
-            -&sel_2,
-            initial_state[8].clone(),
-            initial_state[9].clone(),
-            initial_state[10].clone(),
-            initial_state[11].clone(),
-            initial_state[12].clone(),
-            initial_state[13].clone(),
-            initial_state[14].clone(),
-            initial_state[15].clone(),
+            id.clone(),
+            in_state[8].clone(),
+            in_state[9].clone(),
+            in_state[10].clone(),
+            in_state[11].clone(),
+            in_state[12].clone(),
+            in_state[13].clone(),
+            in_state[14].clone(),
+            in_state[15].clone(),
         ],
     ));
 
+    let sel = &is_external_idx_1_nonzero * &is_last_round;
+    let id = {
+        let v = &(&is_last_round * &external_idx_1) + &(&is_not_last_round * &out_left_id);
+        let t = eval.next_trace_mask();
+        eval.add_constraint(&v - &t);
+        t
+    };
     eval.add_to_relation(RelationEntryVar::new(
         lookup_elements,
-        is_sel_3_nonzero,
+        &sel.clone() + &is_not_last_round,
         &[
-            -&sel_3,
-            state[0].clone(),
-            state[1].clone(),
-            state[2].clone(),
-            state[3].clone(),
-            state[4].clone(),
-            state[5].clone(),
-            state[6].clone(),
-            state[7].clone(),
+            id.clone(),
+            out_state[0].clone(),
+            out_state[1].clone(),
+            out_state[2].clone(),
+            out_state[3].clone(),
+            out_state[4].clone(),
+            out_state[5].clone(),
+            out_state[6].clone(),
+            out_state[7].clone(),
         ],
     ));
 
+    let sel = &is_external_idx_2_nonzero * &is_last_round;
+    let id = {
+        let v = &(&is_last_round * &external_idx_2) + &(&is_not_last_round * &out_right_id);
+        let t = eval.next_trace_mask();
+        eval.add_constraint(&v - &t);
+        t
+    };
     eval.add_to_relation(RelationEntryVar::new(
         lookup_elements,
-        is_sel_4_nonzero,
+        &sel + &is_not_last_round,
         &[
-            -&sel_4,
-            state[8].clone(),
-            state[9].clone(),
-            state[10].clone(),
-            state[11].clone(),
-            state[12].clone(),
-            state[13].clone(),
-            state[14].clone(),
-            state[15].clone(),
+            id.clone(),
+            out_state[8].clone(),
+            out_state[9].clone(),
+            out_state[10].clone(),
+            out_state[11].clone(),
+            out_state[12].clone(),
+            out_state[13].clone(),
+            out_state[14].clone(),
+            out_state[15].clone(),
         ],
     ));
 

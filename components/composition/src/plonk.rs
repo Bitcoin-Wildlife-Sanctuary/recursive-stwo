@@ -3,7 +3,7 @@ use circle_plonk_dsl_constraint_system::dvar::DVar;
 use circle_plonk_dsl_data_structures::PlonkWithAcceleratorLookupElementsVar;
 use circle_plonk_dsl_fields::QM31Var;
 use std::ops::Neg;
-use stwo_prover::constraint_framework::preprocessed_columns::PreprocessedColumn;
+use stwo_prover::examples::plonk::Plonk;
 
 pub fn evaluate_plonk<'a>(
     lookup_elements: &PlonkWithAcceleratorLookupElementsVar,
@@ -11,15 +11,16 @@ pub fn evaluate_plonk<'a>(
 ) -> EvalAtRowVar<'a> {
     let cs = lookup_elements.cs();
 
-    let a_wire = eval.get_preprocessed_column(PreprocessedColumn::Plonk(0));
-    let b_wire = eval.get_preprocessed_column(PreprocessedColumn::Plonk(1));
-    let c_wire = eval.get_preprocessed_column(PreprocessedColumn::Plonk(2));
-    let op = eval.get_preprocessed_column(PreprocessedColumn::Plonk(3));
-    let mult_a = eval.get_preprocessed_column(PreprocessedColumn::Plonk(4));
-    let mult_b = eval.get_preprocessed_column(PreprocessedColumn::Plonk(5));
-    let mult_c = eval.get_preprocessed_column(PreprocessedColumn::Plonk(6));
-    let mult_poseidon = eval.get_preprocessed_column(PreprocessedColumn::Plonk(7));
-    let enforce_c_m31 = eval.get_preprocessed_column(PreprocessedColumn::Plonk(8));
+    let a_wire = eval.get_preprocessed_column(Plonk::new("a_wire".to_string()).id());
+    let b_wire = eval.get_preprocessed_column(Plonk::new("b_wire".to_string()).id());
+    let c_wire = eval.get_preprocessed_column(Plonk::new("c_wire".to_string()).id());
+    let op = eval.get_preprocessed_column(Plonk::new("op".to_string()).id());
+    let mult_a = eval.get_preprocessed_column(Plonk::new("mult_a".to_string()).id());
+    let mult_b = eval.get_preprocessed_column(Plonk::new("mult_b".to_string()).id());
+    let mult_c = eval.get_preprocessed_column(Plonk::new("mult_c".to_string()).id());
+    let poseidon_wire = eval.get_preprocessed_column(Plonk::new("poseidon_wire".to_string()).id());
+    let mult_poseidon = eval.get_preprocessed_column(Plonk::new("mult_poseidon".to_string()).id());
+    let enforce_c_m31 = eval.get_preprocessed_column(Plonk::new("enforce_c_m31".to_string()).id());
 
     let a_val_0 = eval.next_trace_mask();
     let a_val_1 = eval.next_trace_mask();
@@ -86,7 +87,7 @@ pub fn evaluate_plonk<'a>(
         lookup_elements,
         mult_poseidon.neg(),
         &[
-            c_wire.neg(),
+            poseidon_wire,
             a_val_0,
             a_val_1,
             a_val_2,

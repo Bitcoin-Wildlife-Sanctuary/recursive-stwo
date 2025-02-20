@@ -28,10 +28,6 @@ pub fn demo_recurse(
     dest: &Path,
     dest_config: PcsConfig,
 ) {
-    if std::fs::exists(dest).unwrap() {
-        return;
-    }
-
     let mut fs = std::fs::File::open(src).unwrap();
 
     let proof: PlonkWithPoseidonProof<Poseidon31MerkleHasher> =
@@ -104,13 +100,15 @@ pub fn demo_recurse(
     cs.check_poseidon_invocations();
 
     let (plonk, mut poseidon) = cs.generate_circuit();
-    let proof = prove_plonk_with_poseidon::<Poseidon31MerkleChannel>(
-        plonk.mult_a.length.ilog2(),
-        poseidon.0.len().ilog2(),
-        dest_config,
-        &plonk,
-        &mut poseidon,
-    );
+
+    if std::fs::exists(dest).unwrap() {
+        return;
+    }
+
+    let timer = std::time::Instant::now();
+    let proof =
+        prove_plonk_with_poseidon::<Poseidon31MerkleChannel>(dest_config, &plonk, &mut poseidon);
+    println!("proof generation time: {}s", timer.elapsed().as_secs_f64());
 
     let encoded = bincode::serialize(&proof).unwrap();
     let mut fs = std::fs::File::create(dest).unwrap();
@@ -137,32 +135,36 @@ fn main() {
         pow_bits: 20,
         fri_config: FriConfig::new(0, 1, 80),
     };
+    let fast_prover2_config = PcsConfig {
+        pow_bits: 20,
+        fri_config: FriConfig::new(0, 3, 27),
+    };
     let fast_verifier_config = PcsConfig {
         pow_bits: 20,
         fri_config: FriConfig::new(0, 9, 9),
     };
-    let fastest_verifier_config = PcsConfig {
+    let fast_verifier2_config = PcsConfig {
         pow_bits: 20,
         fri_config: FriConfig::new(0, 10, 8),
     };
 
     demo_recurse(
-        Path::new("../../components/test_data/recursive_proof_18_13.bin"),
-        standard_config,
-        1,
-        Path::new("data/level1-1.bin"),
-        standard_config,
-    );
-    demo_recurse(
-        Path::new("data/level1-1.bin"),
+        Path::new("../../components/test_data/recursive_proof_18_17.bin"),
         standard_config,
         5,
-        Path::new("data/level2-5.bin"),
+        Path::new("data/level1-5.bin"),
         fast_prover_config,
     );
     demo_recurse(
-        Path::new("data/level2-5.bin"),
+        Path::new("data/level1-5.bin"),
         fast_prover_config,
+        1,
+        Path::new("data/level2-1.bin"),
+        fast_prover2_config,
+    );
+    demo_recurse(
+        Path::new("data/level2-1.bin"),
+        fast_prover2_config,
         1,
         Path::new("data/level3-1.bin"),
         standard_config,
@@ -179,39 +181,46 @@ fn main() {
         fast_prover_config,
         1,
         Path::new("data/level5-1.bin"),
-        standard_config,
+        fast_prover2_config,
     );
     demo_recurse(
         Path::new("data/level5-1.bin"),
+        fast_prover2_config,
+        1,
+        Path::new("data/level6-1.bin"),
+        standard_config,
+    );
+    demo_recurse(
+        Path::new("data/level6-1.bin"),
         standard_config,
         1,
-        Path::new("data/level6-1.bin"),
-        fast_verifier_config,
-    );
-    demo_recurse(
-        Path::new("data/level6-1.bin"),
-        fast_verifier_config,
-        1,
         Path::new("data/level7-1.bin"),
-        fast_verifier_config,
+        standard_config,
     );
     demo_recurse(
         Path::new("data/level7-1.bin"),
+        standard_config,
+        1,
+        Path::new("data/level8-1.bin"),
+        fast_verifier_config,
+    );
+    demo_recurse(
+        Path::new("data/level8-1.bin"),
         fast_verifier_config,
         1,
-        Path::new("data/level8-1.bin"),
-        fastest_verifier_config,
+        Path::new("data/level9-1.bin"),
+        fast_verifier_config,
     );
     demo_recurse(
-        Path::new("data/level8-1.bin"),
-        fastest_verifier_config,
+        Path::new("data/level9-1.bin"),
+        fast_verifier_config,
         1,
-        Path::new("data/level9-1.bin"),
-        fastest_verifier_config,
+        Path::new("data/level10-1.bin"),
+        fast_verifier2_config,
     );
     demo_recurse(
-        Path::new("data/level9-1.bin"),
-        fastest_verifier_config,
+        Path::new("data/level10-1.bin"),
+        fast_verifier2_config,
         1,
         Path::new("data/level10-1.bin"),
         fast_prover_config,
