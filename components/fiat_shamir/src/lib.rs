@@ -107,7 +107,7 @@ impl FiatShamirResults {
         channel.absorb_one_felt_and_permute(&nonce_felt);
 
         let lower_bits = BitsVar::from_m31(&channel.digest.to_qm31()[0].decompose_m31()[0], 31)
-            .compose_range(0..20);
+            .compose_range(0..pcs_config.pow_bits as usize);
         lower_bits.equalverify(&M31Var::zero(&cs));
 
         let mut raw_queries = Vec::with_capacity(pcs_config.fri_config.n_queries);
