@@ -61,6 +61,8 @@ pub fn demo_recurse(
     for _ in 0..multipliers {
         let mut proof_var = PlonkWithPoseidonProofVar::new_witness(&cs, &proof);
 
+        println!("-> after allocating the proof: {}", cs.num_plonk_rows());
+
         let fiat_shamir_results = FiatShamirResults::compute(
             &fiat_shamir_hints,
             &mut proof_var,
@@ -71,6 +73,9 @@ pub fn demo_recurse(
                 (3, QM31Var::j(&cs)),
             ],
         );
+
+        println!("-> after fiat-shamir: {}", cs.num_plonk_rows());
+
         CompositionCheck::compute(
             &fiat_shamir_hints,
             &fiat_shamir_results.lookup_elements,
@@ -78,6 +83,8 @@ pub fn demo_recurse(
             fiat_shamir_results.oods_point.clone(),
             &proof_var,
         );
+
+        println!("-> after composition: {}", cs.num_plonk_rows());
 
         let answer_results = AnswerResults::compute(
             &CirclePointQM31Var::new_witness(&cs, &fiat_shamir_hints.oods_point),
@@ -89,6 +96,8 @@ pub fn demo_recurse(
             src_config,
         );
 
+        println!("-> after answer: {}", cs.num_plonk_rows());
+
         FoldingResults::compute(
             &proof_var,
             &fiat_shamir_hints,
@@ -97,6 +106,8 @@ pub fn demo_recurse(
             &first_layer_hints,
             &inner_layer_hints,
         );
+
+        println!("-> after folding: {}", cs.num_plonk_rows());
     }
 
     cs.pad();
