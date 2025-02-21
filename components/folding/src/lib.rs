@@ -1,11 +1,9 @@
 use circle_plonk_dsl_answer::AnswerResults;
-use circle_plonk_dsl_circle::CirclePointM31Var;
 use circle_plonk_dsl_data_structures::{PlonkWithPoseidonProofVar, SinglePairMerkleProofVar};
 use circle_plonk_dsl_fiat_shamir::FiatShamirResults;
 use circle_plonk_dsl_fields::QM31Var;
 use circle_plonk_dsl_hints::{FiatShamirHints, FirstLayerHints, InnerLayersHints};
 use std::collections::{BTreeMap, HashMap};
-use stwo_prover::core::circle::Coset;
 
 pub struct FoldingResults;
 
@@ -148,8 +146,6 @@ impl FoldingResults {
 
             let queries = answer_results.query_positions_per_log_size[log_size].clone();
 
-            let domain = Coset::half_odds(log_size);
-
             let merkle_proofs = inner_layers_hints.merkle_proofs.get(&log_size).unwrap();
 
             let mut new_folded = vec![];
@@ -169,7 +165,7 @@ impl FoldingResults {
                 left_query.value[0] = false;
                 left_query.variables[0] = 0;
 
-                let point = CirclePointM31Var::bit_reverse_at(&domain, &left_query, log_size);
+                let point = query.get_absolute_point();
                 let x_inv = point.x.inv();
 
                 let (left_val, right_val) = QM31Var::swap(
