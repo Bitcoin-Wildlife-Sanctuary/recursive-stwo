@@ -6,7 +6,6 @@ use circle_plonk_dsl_fields::QM31Var;
 use circle_plonk_dsl_hints::{FiatShamirHints, FirstLayerHints, InnerLayersHints};
 use std::collections::{BTreeMap, HashMap};
 use stwo_prover::core::circle::Coset;
-use stwo_prover::core::poly::circle::CanonicCoset;
 
 pub struct FoldingResults;
 
@@ -27,10 +26,9 @@ impl FoldingResults {
             let mut proof = SinglePairMerkleProofVar::new(&cs, proof);
             proof.verify(
                 &proof_var.stark_proof.fri_proof.first_layer_commitment,
-                &answer_results
-                    .query_positions_per_log_size
-                    .get(&fiat_shamir_hints.max_first_layer_column_log_size)
-                    .unwrap()[i],
+                &answer_results.query_positions_per_log_size
+                    [fiat_shamir_hints.max_first_layer_column_log_size][i]
+                    .bits,
             );
             proofs.push(proof);
         }
@@ -60,29 +58,22 @@ impl FoldingResults {
         let mut folded_results = BTreeMap::new();
         for &log_size in fiat_shamir_hints.all_log_sizes.iter() {
             let mut folded_results_per_log_size = Vec::new();
-            let circle_domain = CanonicCoset::new(log_size).circle_domain();
-            for (proof, query) in proofs.iter().zip(
-                answer_results
-                    .query_positions_per_log_size
-                    .get(&log_size)
-                    .unwrap(),
-            ) {
+            for (proof, query) in proofs
+                .iter()
+                .zip(answer_results.query_positions_per_log_size[log_size].iter())
+            {
                 let self_val = proof.self_columns.get(&(log_size as usize)).unwrap();
                 let sibling_val = proof.siblings_columns.get(&(log_size as usize)).unwrap();
 
-                let mut left_query = query.clone();
-                left_query.value[0] = false;
-                left_query.variables[0] = 0;
-
-                let point = CirclePointM31Var::bit_reverse_at(
-                    &circle_domain.half_coset,
-                    &left_query,
-                    log_size,
-                );
+                let point = query.get_absolute_point().double();
                 let y_inv = point.y.inv();
 
-                let (left_val, right_val) =
-                    QM31Var::swap(&self_val, &sibling_val, query.value[0], query.variables[0]);
+                let (left_val, right_val) = QM31Var::swap(
+                    &self_val,
+                    &sibling_val,
+                    query.bits.value[0],
+                    query.bits.variables[0],
+                );
 
                 let new_left_val = &left_val + &right_val;
                 let new_right_val = &(&left_val - &right_val) * &y_inv;
@@ -142,15 +133,6 @@ impl FoldingResults {
             folded.push(QM31Var::zero(&cs));
         }
 
-        let mut queries = answer_results
-            .query_positions_per_log_size
-            .get(&log_size)
-            .unwrap()
-            .clone();
-        queries
-            .iter_mut()
-            .for_each(|q| *q = q.index_range_from(1..));
-
         for i in 0..inner_layers_hints.merkle_proofs.len() {
             if let Some(folded_into) = folded_results.get(&log_size) {
                 assert_eq!(folded_into.len(), folded.len());
@@ -163,6 +145,8 @@ impl FoldingResults {
             }
 
             log_size -= 1;
+
+            let queries = answer_results.query_positions_per_log_size[log_size].clone();
 
             let domain = Coset::half_odds(log_size);
 
@@ -181,15 +165,19 @@ impl FoldingResults {
                     .unwrap();
                 folded_result.equalverify(&self_val);
 
-                let mut left_query = query.clone();
+                let mut left_query = query.bits.clone();
                 left_query.value[0] = false;
                 left_query.variables[0] = 0;
 
                 let point = CirclePointM31Var::bit_reverse_at(&domain, &left_query, log_size);
                 let x_inv = point.x.inv();
 
-                let (left_val, right_val) =
-                    QM31Var::swap(&self_val, &sibling_val, query.value[0], query.variables[0]);
+                let (left_val, right_val) = QM31Var::swap(
+                    &self_val,
+                    &sibling_val,
+                    query.bits.value[0],
+                    query.bits.variables[0],
+                );
 
                 let new_left_val = &left_val + &right_val;
                 let new_right_val = &(&left_val - &right_val) * &x_inv;
@@ -200,13 +188,10 @@ impl FoldingResults {
 
                 merkle_proof.verify(
                     &proof_var.stark_proof.fri_proof.inner_layer_commitments[i],
-                    &query,
+                    &query.bits,
                 );
             }
             folded = new_folded;
-            queries
-                .iter_mut()
-                .for_each(|q| *q = q.index_range_from(1..));
         }
 
         for v in folded.iter() {
