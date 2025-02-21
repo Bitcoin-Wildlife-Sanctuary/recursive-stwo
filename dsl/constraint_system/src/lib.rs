@@ -402,7 +402,7 @@ impl ConstraintSystem {
 
         // pad the Poseidon accelerator first
         let poseidon_len = self.flow.0.len();
-        let padded_poseidon_len = max(N_LANES * 2, poseidon_len.next_power_of_two());
+        let padded_poseidon_len = max(N_LANES * 2, poseidon_len.div_ceil(16) * 16);
 
         if padded_poseidon_len > poseidon_len {
             for _ in poseidon_len..padded_poseidon_len {

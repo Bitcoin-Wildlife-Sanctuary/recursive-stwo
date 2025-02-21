@@ -163,17 +163,9 @@ fn main() {
         pow_bits: 20,
         fri_config: FriConfig::new(0, 8, 10),
     };
-    let fast_verifier3_config = PcsConfig {
-        pow_bits: 20,
-        fri_config: FriConfig::new(0, 9, 9),
-    };
-    let fast_verifier4_config = PcsConfig {
-        pow_bits: 20,
-        fri_config: FriConfig::new(0, 10, 8),
-    };
 
     demo_recurse(
-        Path::new("../../components/test_data/recursive_proof_16_18.bin"),
+        Path::new("../../components/test_data/recursive_proof_16_17.bin"),
         standard_config,
         5,
         Path::new("data/level1-5.bin"),
@@ -254,34 +246,6 @@ fn main() {
         fast_verifier2_config,
         1,
         Path::new("data/level12-1.bin"),
-        fast_verifier3_config,
-    );
-    demo_recurse(
-        Path::new("data/level12-1.bin"),
-        fast_verifier3_config,
-        1,
-        Path::new("data/level13-1.bin"),
-        fast_verifier3_config,
-    );
-    demo_recurse(
-        Path::new("data/level13-1.bin"),
-        fast_verifier3_config,
-        1,
-        Path::new("data/level14-1.bin"),
-        fast_verifier4_config,
-    );
-    demo_recurse(
-        Path::new("data/level14-1.bin"),
-        fast_verifier4_config,
-        1,
-        Path::new("data/level15-1.bin"),
-        fast_verifier4_config,
-    );
-    demo_recurse(
-        Path::new("data/level15-1.bin"),
-        fast_verifier4_config,
-        1,
-        Path::new("data/level16-1.bin"),
         fast_prover_config,
     );
 }
