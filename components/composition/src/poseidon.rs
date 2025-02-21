@@ -82,19 +82,26 @@ pub fn evaluate_poseidon<'a>(
         eval.get_preprocessed_column(Poseidon::new("is_last_round".to_string()).id());
     let is_full_round =
         eval.get_preprocessed_column(Poseidon::new("is_full_round".to_string()).id());
-    let is_partial_round =
-        eval.get_preprocessed_column(Poseidon::new("is_partial_round".to_string()).id());
 
     let one = QM31Var::one(&cs);
 
     let is_not_first_round = &one - &is_first_round;
     let is_not_last_round = &one - &is_last_round;
+    let is_partial_round = &is_not_first_round - &is_full_round;
 
     let round_id = eval.get_preprocessed_column(Poseidon::new("round_id".to_string()).id());
 
-    let mut rc = vec![];
+    let mut rc0 = vec![];
     for i in 0..16 {
-        rc.push(eval.get_preprocessed_column(Poseidon::new(format!("rc {}", i).to_string()).id()));
+        rc0.push(
+            eval.get_preprocessed_column(Poseidon::new(format!("rc0 {}", i).to_string()).id()),
+        );
+    }
+    let mut rc1 = vec![];
+    for i in 0..16 {
+        rc1.push(
+            eval.get_preprocessed_column(Poseidon::new(format!("rc1 {}", i).to_string()).id()),
+        );
     }
 
     let external_idx_1 =
@@ -106,13 +113,12 @@ pub fn evaluate_poseidon<'a>(
     let is_external_idx_2_nonzero =
         eval.get_preprocessed_column(Poseidon::new("is_external_idx_2_nonzero".to_string()).id());
 
-    let swap_bit_addr =
-        eval.get_preprocessed_column(Poseidon::new("swap_bit_addr".to_string()).id());
-
-    let swap_bit_value = eval.next_trace_mask();
+    let swap_bit_addr = rc0[0].clone();
 
     let in_state: [_; N_STATE] = std::array::from_fn(|_| eval.next_trace_mask());
+    let intermediate_state: [_; N_STATE] = std::array::from_fn(|_| eval.next_trace_mask());
     let out_state: [_; N_STATE] = std::array::from_fn(|_| eval.next_trace_mask());
+    let swap_bit_value = intermediate_state[0].clone();
 
     // if this is first round
     let one_minus_swap_bit_value = &one - &swap_bit_value;
@@ -131,7 +137,16 @@ pub fn evaluate_poseidon<'a>(
     // if this is a full round
     let mut full_round_state = in_state.clone();
     (0..N_STATE).for_each(|i| {
-        full_round_state[i] = &full_round_state[i] + &rc[i];
+        full_round_state[i] = &full_round_state[i] + &rc0[i];
+    });
+    full_round_state = std::array::from_fn(|i| pow5(full_round_state[i].clone()));
+    (0..N_STATE).for_each(|i| {
+        eval.add_constraint(&is_full_round * &(&intermediate_state[i] - &full_round_state[i]));
+        full_round_state[i] = intermediate_state[i].clone();
+    });
+    apply_external_round_matrix(&mut full_round_state);
+    (0..N_STATE).for_each(|i| {
+        full_round_state[i] = &full_round_state[i] + &rc1[i];
     });
     full_round_state = std::array::from_fn(|i| pow5(full_round_state[i].clone()));
     apply_external_round_matrix(&mut full_round_state);
@@ -141,9 +156,15 @@ pub fn evaluate_poseidon<'a>(
 
     // if this is a partial round
     let mut partial_round_state = in_state.clone();
-    partial_round_state[0] = &partial_round_state[0] + &rc[0];
-    partial_round_state[0] = pow5(partial_round_state[0].clone());
-    apply_internal_round_matrix(&mut partial_round_state);
+    for r in 0..14 {
+        partial_round_state[0] = &partial_round_state[0] + &rc0[r];
+        partial_round_state[0] = pow5(partial_round_state[0].clone());
+        eval.add_constraint(
+            &is_partial_round * &(&intermediate_state[r] - &partial_round_state[0]),
+        );
+        partial_round_state[0] = intermediate_state[r].clone();
+        apply_internal_round_matrix(&mut partial_round_state);
+    }
     (0..N_STATE).for_each(|i| {
         eval.add_constraint(&is_partial_round * &(&out_state[i] - &partial_round_state[i]));
     });

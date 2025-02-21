@@ -165,7 +165,7 @@ fn main() {
     };
 
     demo_recurse(
-        Path::new("../../components/test_data/recursive_proof_16_17.bin"),
+        Path::new("../../components/test_data/recursive_proof_16_15.bin"),
         standard_config,
         5,
         Path::new("data/level1-5.bin"),

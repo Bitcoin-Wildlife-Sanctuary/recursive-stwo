@@ -97,7 +97,7 @@ impl AnswerResults {
                     .collect_vec()
             });
         mask_points_poseidon[PREPROCESSED_TRACE_IDX] =
-            vec![vec![(ShiftIndex::Zero, oods_point.clone())]; 26];
+            vec![vec![(ShiftIndex::Zero, oods_point.clone())]; 40];
 
         assert_eq!(
             mask_points_plonk.len(),
