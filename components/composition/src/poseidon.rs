@@ -155,12 +155,7 @@ pub fn evaluate_poseidon<'a>(
     let out_right_id = &out_left_id + &one;
 
     let sel = &is_external_idx_1_nonzero * &is_first_round;
-    let id = {
-        let v = &(&is_first_round * &external_idx_1) + &(&is_not_first_round * &in_left_id);
-        let t = eval.next_trace_mask();
-        eval.add_constraint(&v - &t);
-        t
-    };
+    let id = &(&is_first_round * &external_idx_1) + &(&is_not_first_round * &in_left_id);
     eval.add_to_relation(RelationEntryVar::new(
         lookup_elements,
         &sel - &is_not_first_round,
@@ -178,12 +173,7 @@ pub fn evaluate_poseidon<'a>(
     ));
 
     let sel = &is_external_idx_2_nonzero * &is_first_round;
-    let id = {
-        let v = &(&is_first_round * &external_idx_2) + &(&is_not_first_round * &in_right_id);
-        let t = eval.next_trace_mask();
-        eval.add_constraint(&v - &t);
-        t
-    };
+    let id = &(&is_first_round * &external_idx_2) + &(&is_not_first_round * &in_right_id);
     eval.add_to_relation(RelationEntryVar::new(
         lookup_elements,
         &sel - &is_not_first_round,
@@ -201,12 +191,7 @@ pub fn evaluate_poseidon<'a>(
     ));
 
     let sel = &is_external_idx_1_nonzero * &is_last_round;
-    let id = {
-        let v = &(&is_last_round * &external_idx_1) + &(&is_not_last_round * &out_left_id);
-        let t = eval.next_trace_mask();
-        eval.add_constraint(&v - &t);
-        t
-    };
+    let id = &(&is_last_round * &external_idx_1) + &(&is_not_last_round * &out_left_id);
     eval.add_to_relation(RelationEntryVar::new(
         lookup_elements,
         &sel.clone() + &is_not_last_round,
@@ -224,12 +209,7 @@ pub fn evaluate_poseidon<'a>(
     ));
 
     let sel = &is_external_idx_2_nonzero * &is_last_round;
-    let id = {
-        let v = &(&is_last_round * &external_idx_2) + &(&is_not_last_round * &out_right_id);
-        let t = eval.next_trace_mask();
-        eval.add_constraint(&v - &t);
-        t
-    };
+    let id = &(&is_last_round * &external_idx_2) + &(&is_not_last_round * &out_right_id);
     eval.add_to_relation(RelationEntryVar::new(
         lookup_elements,
         &sel + &is_not_last_round,
@@ -251,6 +231,6 @@ pub fn evaluate_poseidon<'a>(
         &[swap_bit_addr, swap_bit_value],
     ));
 
-    eval.finalize_logup(5);
+    eval.finalize_logup(3);
     eval
 }

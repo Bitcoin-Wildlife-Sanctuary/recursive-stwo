@@ -28,7 +28,11 @@ pub fn demo_recurse(
     dest: &Path,
     dest_config: PcsConfig,
 ) {
-    println!("Generating a proof at {} that verifies {}", dest.display(), src.display());
+    println!(
+        "Generating a proof at {} that verifies {}",
+        dest.display(),
+        src.display()
+    );
     let mut fs = std::fs::File::open(src).unwrap();
 
     let proof: PlonkWithPoseidonProof<Poseidon31MerkleHasher> =
@@ -146,9 +150,13 @@ fn main() {
     };
     let fast_verifier2_config = PcsConfig {
         pow_bits: 20,
-        fri_config: FriConfig::new(0, 9, 9),
+        fri_config: FriConfig::new(0, 8, 10),
     };
     let fast_verifier3_config = PcsConfig {
+        pow_bits: 20,
+        fri_config: FriConfig::new(0, 9, 9),
+    };
+    let fast_verifier4_config = PcsConfig {
         pow_bits: 20,
         fri_config: FriConfig::new(0, 10, 8),
     };
@@ -249,6 +257,20 @@ fn main() {
         fast_verifier3_config,
         1,
         Path::new("data/level14-1.bin"),
+        fast_verifier4_config,
+    );
+    demo_recurse(
+        Path::new("data/level14-1.bin"),
+        fast_verifier4_config,
+        1,
+        Path::new("data/level15-1.bin"),
+        fast_verifier4_config,
+    );
+    demo_recurse(
+        Path::new("data/level15-1.bin"),
+        fast_verifier4_config,
+        1,
+        Path::new("data/level16-1.bin"),
         fast_prover_config,
     );
 }
