@@ -28,6 +28,7 @@ pub fn demo_recurse(
     dest: &Path,
     dest_config: PcsConfig,
 ) {
+    println!("Generating a proof at {} that verifies {}", dest.display(), src.display());
     let mut fs = std::fs::File::open(src).unwrap();
 
     let proof: PlonkWithPoseidonProof<Poseidon31MerkleHasher> =
@@ -141,7 +142,7 @@ fn main() {
     };
     let fast_verifier_config = PcsConfig {
         pow_bits: 20,
-        fri_config: FriConfig::new(0, 8, 10),
+        fri_config: FriConfig::new(0, 7, 12),
     };
     let fast_verifier2_config = PcsConfig {
         pow_bits: 20,
