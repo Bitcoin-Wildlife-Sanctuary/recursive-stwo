@@ -259,4 +259,11 @@ fn main() {
         Path::new("data/level13-1.bin"),
         fast_verifier3_config,
     );
+    demo_recurse(
+        Path::new("data/level13-1.bin"),
+        fast_verifier3_config,
+        1,
+        Path::new("data/level14-1.bin"),
+        fast_prover_config,
+    );
 }
