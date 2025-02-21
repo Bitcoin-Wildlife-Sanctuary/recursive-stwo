@@ -168,18 +168,22 @@ impl<'a> EvalAtRowVar<'a> {
             .accumulate(&value * &self.denom_inverse);
     }
 
-    pub fn finalize_logup_in_pairs(&mut self) {
-        let num_batches = self.logup.fracs.len().div_ceil(2);
+    pub fn finalize_logup(&mut self, batch_size: usize) {
+        let num_batches = self.logup.fracs.len().div_ceil(batch_size);
 
         let mut batched_fracs = vec![];
-        for chunk in self.logup.fracs.chunks(2) {
+        for chunk in self.logup.fracs.chunks(batch_size) {
             let (num, denom) = if chunk.len() == 1 {
                 chunk[0].clone()
             } else {
-                let (p1, q1) = &chunk[0];
-                let (p2, q2) = &chunk[1];
+                let mut p = chunk[0].0.clone();
+                let mut q = chunk[0].1.clone();
 
-                (&(p1 * q2) + &(p2 * q1), q1 * q2)
+                for elem in chunk.iter().skip(1) {
+                    p = &(&p * &elem.1) + &(&elem.0 * &q);
+                    q = &q * &elem.1;
+                }
+                (p, q)
             };
             batched_fracs.push((num, denom));
         }
@@ -203,5 +207,9 @@ impl<'a> EvalAtRowVar<'a> {
             self.add_constraint(&(&fixed_diff * denom) - num);
             self.logup.is_finalized = true;
         }
+    }
+
+    pub fn finalize_logup_in_pairs(&mut self) {
+        self.finalize_logup(2)
     }
 }

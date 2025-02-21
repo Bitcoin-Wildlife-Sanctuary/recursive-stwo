@@ -12,7 +12,7 @@ use stwo_prover::core::fields::qm31::QM31;
 use stwo_prover::core::vcs::poseidon31_ref::poseidon2_permute;
 use stwo_prover::examples::plonk_with_poseidon::plonk::PlonkWithAcceleratorCircuitTrace;
 use stwo_prover::examples::plonk_with_poseidon::poseidon::{
-    PoseidonEntry, PoseidonFlow, CONSTANT_1, CONSTANT_2, CONSTANT_3,
+    PoseidonEntry, PoseidonFlow, SwapOption, CONSTANT_1, CONSTANT_2, CONSTANT_3,
 };
 
 pub mod dvar;
@@ -86,10 +86,15 @@ impl ConstraintSystemRef {
         entry_2: PoseidonEntry,
         entry_3: PoseidonEntry,
         entry_4: PoseidonEntry,
+        swap_option: SwapOption,
     ) {
-        self.0
-            .borrow_mut()
-            .invoke_poseidon_accelerator(entry_1, entry_2, entry_3, entry_4);
+        self.0.borrow_mut().invoke_poseidon_accelerator(
+            entry_1,
+            entry_2,
+            entry_3,
+            entry_4,
+            swap_option,
+        );
     }
 
     pub fn pad(&self) {
@@ -223,8 +228,11 @@ impl ConstraintSystem {
         entry_2: PoseidonEntry,
         entry_3: PoseidonEntry,
         entry_4: PoseidonEntry,
+        swap_option: SwapOption,
     ) {
-        self.flow.0.push((entry_1, entry_2, entry_3, entry_4));
+        self.flow
+            .0
+            .push((entry_1, entry_2, entry_3, entry_4, swap_option));
     }
 
     pub fn enforce_zero(&mut self, var: usize) {
@@ -415,6 +423,7 @@ impl ConstraintSystem {
                         wire: 0,
                         hash: CONSTANT_3,
                     },
+                    SwapOption::default(),
                 );
             }
         }
@@ -502,6 +511,10 @@ impl ConstraintSystem {
             counts[i + 1] += 1;
         }
 
+        for (_, _, _, _, swap) in self.flow.0.iter() {
+            counts[swap.addr] += 1;
+        }
+
         let mut first_occurred = vec![false; n_vars];
         let mut mult_a = Vec::with_capacity(n_rows);
         let mut mult_b = Vec::with_capacity(n_rows);
@@ -534,7 +547,7 @@ impl ConstraintSystem {
         }
 
         let mut mult_poseidon_vars = vec![0; n_vars];
-        for (r1, r2, r3, r4) in self.flow.0.iter() {
+        for (r1, r2, r3, r4, _) in self.flow.0.iter() {
             mult_poseidon_vars[r1.wire] += 1;
             mult_poseidon_vars[r2.wire] += 1;
             mult_poseidon_vars[r3.wire] += 1;
@@ -573,7 +586,7 @@ impl ConstraintSystem {
             }
         }
 
-        for (r1, r2, r3, r4) in self.flow.0.iter() {
+        for (r1, r2, r3, r4, swap) in self.flow.0.iter() {
             if r1.wire != 0 {
                 assert_eq!(*map.get(&r1.wire).unwrap(), r1.hash,);
             }
@@ -587,11 +600,19 @@ impl ConstraintSystem {
                 assert_eq!(*map.get(&r4.wire).unwrap(), r4.hash);
             }
 
-            let mut state: [M31; 16] = [
-                r1.hash[0], r1.hash[1], r1.hash[2], r1.hash[3], r1.hash[4], r1.hash[5], r1.hash[6],
-                r1.hash[7], r2.hash[0], r2.hash[1], r2.hash[2], r2.hash[3], r2.hash[4], r2.hash[5],
-                r2.hash[6], r2.hash[7],
-            ];
+            let mut state: [M31; 16] = if !swap.swap {
+                [
+                    r1.hash[0], r1.hash[1], r1.hash[2], r1.hash[3], r1.hash[4], r1.hash[5],
+                    r1.hash[6], r1.hash[7], r2.hash[0], r2.hash[1], r2.hash[2], r2.hash[3],
+                    r2.hash[4], r2.hash[5], r2.hash[6], r2.hash[7],
+                ]
+            } else {
+                [
+                    r2.hash[0], r2.hash[1], r2.hash[2], r2.hash[3], r2.hash[4], r2.hash[5],
+                    r2.hash[6], r2.hash[7], r1.hash[0], r1.hash[1], r1.hash[2], r1.hash[3],
+                    r1.hash[4], r1.hash[5], r1.hash[6], r1.hash[7],
+                ]
+            };
             let expected: [M31; 16] = [
                 r3.hash[0], r3.hash[1], r3.hash[2], r3.hash[3], r3.hash[4], r3.hash[5], r3.hash[6],
                 r3.hash[7], r4.hash[0], r4.hash[1], r4.hash[2], r4.hash[3], r4.hash[4], r4.hash[5],

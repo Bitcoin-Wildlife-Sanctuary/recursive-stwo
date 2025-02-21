@@ -284,7 +284,7 @@ impl SinglePathMerkleProofVar {
     pub fn new(cs: &ConstraintSystemRef, value: &SinglePathMerkleProof) -> Self {
         let mut sibling_hashes = vec![];
         for sibling_hash in value.sibling_hashes.iter() {
-            sibling_hashes.push(HashVar::new_witness(&cs, &sibling_hash.0));
+            sibling_hashes.push(HashVar::new_single_use_witness_only(&cs, &sibling_hash.0));
         }
 
         let mut columns = BTreeMap::new();
@@ -314,7 +314,7 @@ impl SinglePathMerkleProofVar {
         assert_eq!(root.value, self.value.root.0);
         assert_eq!(query.get_value().0, self.value.query as u32);
 
-        let mut cur_hash = Poseidon31MerkleHasherVar::hash_m31_columns(
+        let mut cur_hash = Poseidon31MerkleHasherVar::hash_m31_columns_get_rate(
             &self.columns.get(&self.value.depth).unwrap_or(&vec![]),
         );
 
@@ -322,7 +322,7 @@ impl SinglePathMerkleProofVar {
             let h = self.value.depth - i - 1;
 
             if self.columns.contains_key(&h) {
-                let mut column_hash = Poseidon31MerkleHasherVar::hash_m31_columns(
+                let mut column_hash = Poseidon31MerkleHasherVar::hash_m31_columns_get_capacity(
                     &self.columns.get(&h).unwrap_or(&vec![]),
                 );
                 cur_hash = Poseidon31MerkleHasherVar::hash_tree_with_column_hash_with_swap(
@@ -373,7 +373,7 @@ impl SinglePairMerkleProofVar {
     pub fn new(cs: &ConstraintSystemRef, value: &SinglePairMerkleProof) -> Self {
         let mut sibling_hashes = vec![];
         for sibling_hash in value.sibling_hashes.iter() {
-            sibling_hashes.push(HashVar::new_witness(&cs, &sibling_hash.0));
+            sibling_hashes.push(HashVar::new_single_use_witness_only(&cs, &sibling_hash.0));
         }
 
         let mut self_columns = BTreeMap::new();
@@ -403,11 +403,11 @@ impl SinglePairMerkleProofVar {
 
         let cs = self.cs().and(&root.cs()).and(&query.cs());
 
-        let mut self_hash = Poseidon31MerkleHasherVar::hash_qm31_columns(&[
+        let mut self_hash = Poseidon31MerkleHasherVar::hash_qm31_columns_get_rate(&[
             self.self_columns.get(&self.value.depth).unwrap().clone(),
             QM31Var::zero(&cs),
         ]);
-        let mut sibling_hash = Poseidon31MerkleHasherVar::hash_qm31_columns(&[
+        let mut sibling_hash = Poseidon31MerkleHasherVar::hash_qm31_columns_get_rate(&[
             self.siblings_columns
                 .get(&self.value.depth)
                 .unwrap()
@@ -429,14 +429,16 @@ impl SinglePairMerkleProofVar {
                     sibling_hash = self.sibling_hashes[i].clone();
                 }
             } else {
-                let mut self_column_hash = Poseidon31MerkleHasherVar::hash_qm31_columns(&[
-                    self.self_columns.get(&h).unwrap().clone(),
-                    QM31Var::zero(&cs),
-                ]);
-                let mut sibling_column_hash = Poseidon31MerkleHasherVar::hash_qm31_columns(&[
-                    self.siblings_columns.get(&h).unwrap().clone(),
-                    QM31Var::zero(&cs),
-                ]);
+                let mut self_column_hash =
+                    Poseidon31MerkleHasherVar::hash_qm31_columns_get_capacity(&[
+                        self.self_columns.get(&h).unwrap().clone(),
+                        QM31Var::zero(&cs),
+                    ]);
+                let mut sibling_column_hash =
+                    Poseidon31MerkleHasherVar::hash_qm31_columns_get_capacity(&[
+                        self.siblings_columns.get(&h).unwrap().clone(),
+                        QM31Var::zero(&cs),
+                    ]);
 
                 self_hash = Poseidon31MerkleHasherVar::hash_tree_with_column_hash_with_swap(
                     &mut self_hash,

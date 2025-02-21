@@ -27,9 +27,8 @@ impl ChannelVar {
         Self { n_sent, digest }
     }
 
-    pub fn mix_root(&mut self, root: &mut HashVar) {
-        let (_, right) = Poseidon2HalfStateRef::permute(root, &mut self.digest, true, false);
-        self.digest = right;
+    pub fn mix_root(&mut self, root: &HashVar) {
+        self.digest = Poseidon2HalfStateRef::permute_get_capacity(root, &self.digest);
         self.n_sent = 0;
     }
 
@@ -41,27 +40,20 @@ impl ChannelVar {
 
         let n_sent = QM31Var::from(&n_sent);
 
-        let mut left = Poseidon2HalfStateRef::from_qm31(&n_sent, &QM31Var::zero(&cs));
-        let (left, _) = Poseidon2HalfStateRef::permute(&mut left, &mut self.digest, false, true);
-        left.to_qm31()
+        let left = Poseidon2HalfStateRef::from_qm31(&n_sent, &QM31Var::zero(&cs));
+        Poseidon2HalfStateRef::permute_get_rate(&left, &self.digest).to_qm31()
     }
 
     pub fn absorb_one_felt_and_permute(&mut self, felt: &QM31Var) {
         let cs = self.cs();
-        let mut left = Poseidon2HalfStateRef::from_qm31(&felt, &QM31Var::zero(&cs));
-        let (_, new_right) =
-            Poseidon2HalfStateRef::permute(&mut left, &mut self.digest, true, false);
-
-        self.digest = new_right;
+        let left = Poseidon2HalfStateRef::from_qm31(&felt, &QM31Var::zero(&cs));
+        self.digest = Poseidon2HalfStateRef::permute_get_capacity(&left, &self.digest);
         self.n_sent = 0;
     }
 
     pub fn absorb_two_felts_and_permute(&mut self, felt1: &QM31Var, felt2: &QM31Var) {
-        let mut left = Poseidon2HalfStateRef::from_qm31(&felt1, &felt2);
-        let (_, new_right) =
-            Poseidon2HalfStateRef::permute(&mut left, &mut self.digest, true, false);
-
-        self.digest = new_right;
+        let left = Poseidon2HalfStateRef::from_qm31(&felt1, &felt2);
+        self.digest = Poseidon2HalfStateRef::permute_get_capacity(&left, &self.digest);
         self.n_sent = 0;
     }
 }

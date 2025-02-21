@@ -106,14 +106,26 @@ pub fn evaluate_poseidon<'a>(
     let is_external_idx_2_nonzero =
         eval.get_preprocessed_column(Poseidon::new("is_external_idx_2_nonzero".to_string()).id());
 
+    let swap_bit_addr =
+        eval.get_preprocessed_column(Poseidon::new("swap_bit_addr".to_string()).id());
+
+    let swap_bit_value = eval.next_trace_mask();
+
     let in_state: [_; N_STATE] = std::array::from_fn(|_| eval.next_trace_mask());
     let out_state: [_; N_STATE] = std::array::from_fn(|_| eval.next_trace_mask());
 
     // if this is first round
-    let mut permuted_state = in_state.clone();
+    let one_minus_swap_bit_value = &one - &swap_bit_value;
+    let mut permuted_state: [_; N_STATE] = std::array::from_fn(|i| {
+        if i < 8 {
+            &(&in_state[i] * &one_minus_swap_bit_value) + &(&in_state[i + 8] * &swap_bit_value)
+        } else {
+            &(&in_state[i - 8] * &swap_bit_value) + &(&in_state[i] * &one_minus_swap_bit_value)
+        }
+    });
     apply_external_round_matrix(&mut permuted_state);
     (0..N_STATE).for_each(|i| {
-        eval.add_constraint(&is_first_round * &(&out_state[i] - &permuted_state[i]));
+        eval.add_constraint(&is_first_round * &(&permuted_state[i] - &out_state[i]));
     });
 
     // if this is a full round
@@ -233,7 +245,12 @@ pub fn evaluate_poseidon<'a>(
             out_state[15].clone(),
         ],
     ));
+    eval.add_to_relation(RelationEntryVar::new(
+        lookup_elements,
+        &is_first_round * &is_not_last_round,
+        &[swap_bit_addr, swap_bit_value],
+    ));
 
-    eval.finalize_logup_in_pairs();
+    eval.finalize_logup(5);
     eval
 }

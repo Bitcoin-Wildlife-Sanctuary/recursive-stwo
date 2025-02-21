@@ -2,11 +2,10 @@ use crate::implementation::poseidon2_permute;
 use circle_plonk_dsl_constraint_system::dvar::{AllocVar, AllocationMode, DVar};
 use circle_plonk_dsl_constraint_system::ConstraintSystemRef;
 use circle_plonk_dsl_fields::{M31Var, QM31Var};
-use num_traits::{One, Zero};
-use std::ops::{Add, Neg};
+use num_traits::Zero;
 use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::fields::qm31::QM31;
-use stwo_prover::examples::plonk_with_poseidon::poseidon::PoseidonEntry;
+use stwo_prover::examples::plonk_with_poseidon::poseidon::{PoseidonEntry, SwapOption};
 
 pub mod implementation;
 mod parameters;
@@ -21,6 +20,16 @@ pub struct Poseidon2HalfStateRef {
 }
 
 impl Poseidon2HalfStateRef {
+    pub fn new_single_use_witness_only(cs: &ConstraintSystemRef, value: &[M31; 8]) -> Self {
+        Poseidon2HalfStateRef {
+            cs: cs.clone(),
+            value: value.clone(),
+            left_variable: 0,
+            right_variable: 0,
+            sel_value: 0,
+        }
+    }
+
     pub fn from_m31(slice: &[M31Var]) -> Self {
         assert_eq!(slice.len(), 8);
         let left_variable = QM31Var::from_m31(&slice[0], &slice[1], &slice[2], &slice[3]);
@@ -55,78 +64,6 @@ impl Poseidon2HalfStateRef {
             left_variable,
             right_variable,
             sel_value: half_state_variable,
-        }
-    }
-
-    pub fn swap_permute(
-        a0: &Poseidon2HalfStateRef,
-        a1: &Poseidon2HalfStateRef,
-        bit_value: bool,
-        bit_variable: usize,
-    ) -> Poseidon2HalfStateRef {
-        let cs = a0.cs.and(&a1.cs);
-        let mut bit_variable_not = cs.mul_constant(bit_variable, M31::one().neg());
-        bit_variable_not = cs.add(1, bit_variable_not);
-
-        let t0 = cs.mul(a0.left_variable, bit_variable_not);
-        let t1 = cs.mul(a1.left_variable, bit_variable);
-        let new_a0_left_variable = cs.add(t0, t1);
-
-        let t0 = cs.mul(a0.right_variable, bit_variable_not);
-        let t1 = cs.mul(a1.right_variable, bit_variable);
-        let new_a0_right_variable = cs.add(t0, t1);
-
-        let new_a0_sel_value =
-            cs.assemble_poseidon_gate(new_a0_left_variable, new_a0_right_variable);
-
-        let t0 = cs.mul(a1.left_variable, bit_variable_not);
-        let t1 = cs.mul(a0.left_variable, bit_variable);
-        let new_a1_left_variable = cs.add(t0, t1);
-
-        let t0 = cs.mul(a1.right_variable, bit_variable_not);
-        let t1 = cs.mul(a0.right_variable, bit_variable);
-        let new_a1_right_variable = cs.add(t0, t1);
-
-        let new_a1_sel_value =
-            cs.assemble_poseidon_gate(new_a1_left_variable, new_a1_right_variable);
-
-        let (mut left, mut right) = if !bit_value {
-            (a0.clone(), a1.clone())
-        } else {
-            (a1.clone(), a0.clone())
-        };
-        left.left_variable = new_a0_left_variable;
-        left.right_variable = new_a0_right_variable;
-        left.sel_value = new_a0_sel_value;
-
-        right.left_variable = new_a1_left_variable;
-        right.right_variable = new_a1_right_variable;
-        right.sel_value = new_a1_sel_value;
-
-        let (digest, _) = Self::permute(&mut left, &mut right, false, true);
-        digest
-    }
-}
-
-impl Add<&Poseidon2HalfStateRef> for &Poseidon2HalfStateRef {
-    type Output = Poseidon2HalfStateRef;
-
-    fn add(self, rhs: &Poseidon2HalfStateRef) -> Poseidon2HalfStateRef {
-        let cs = self.cs().and(&rhs.cs);
-
-        let value = std::array::from_fn(|i| self.value[i] + rhs.value[i]);
-
-        let left_variable = cs.add(self.left_variable, rhs.left_variable);
-        let right_variable = cs.add(self.right_variable, rhs.right_variable);
-
-        let sel_value = cs.assemble_poseidon_gate(left_variable, right_variable);
-
-        Poseidon2HalfStateRef {
-            cs,
-            value,
-            left_variable,
-            right_variable,
-            sel_value,
         }
     }
 }
@@ -206,25 +143,73 @@ impl Poseidon2HalfStateRef {
         ]
     }
 
+    pub fn swap_permute_get_rate(
+        left: &Poseidon2HalfStateRef,
+        right: &Poseidon2HalfStateRef,
+        swap_bit_addr: usize,
+        swap_bit_val: bool,
+    ) -> Poseidon2HalfStateRef {
+        let (res, _) = Self::permute(left, right, false, true, swap_bit_addr, swap_bit_val);
+        res
+    }
+
+    pub fn swap_permute_get_capacity(
+        left: &Poseidon2HalfStateRef,
+        right: &Poseidon2HalfStateRef,
+        swap_bit_addr: usize,
+        swap_bit_val: bool,
+    ) -> Poseidon2HalfStateRef {
+        let (_, res) = Self::permute(left, right, true, false, swap_bit_addr, swap_bit_val);
+        res
+    }
+
+    pub fn permute_get_rate(
+        left: &Poseidon2HalfStateRef,
+        right: &Poseidon2HalfStateRef,
+    ) -> Poseidon2HalfStateRef {
+        let (res, _) = Self::permute(left, right, false, true, 0, false);
+        res
+    }
+
+    pub fn permute_get_capacity(
+        left: &Poseidon2HalfStateRef,
+        right: &Poseidon2HalfStateRef,
+    ) -> Poseidon2HalfStateRef {
+        let (_, res) = Self::permute(left, right, true, false, 0, false);
+        res
+    }
+
     pub fn permute(
-        left: &mut Poseidon2HalfStateRef,
-        right: &mut Poseidon2HalfStateRef,
+        left: &Poseidon2HalfStateRef,
+        right: &Poseidon2HalfStateRef,
         ignore_left_result: bool,
         ignore_right_result: bool,
+        swap_bit_addr: usize,
+        swap_bit_val: bool,
     ) -> (Poseidon2HalfStateRef, Poseidon2HalfStateRef) {
         let cs = left.cs().and(&right.cs());
 
-        let mut state: [M31; 16] = std::array::from_fn(|i| {
-            if i < 8 {
-                left.value[i]
-            } else {
-                right.value[i - 8]
-            }
-        });
+        let mut state: [M31; 16] = if !swap_bit_val {
+            std::array::from_fn(|i| {
+                if i < 8 {
+                    left.value[i]
+                } else {
+                    right.value[i - 8]
+                }
+            })
+        } else {
+            std::array::from_fn(|i| {
+                if i < 8 {
+                    right.value[i]
+                } else {
+                    left.value[i - 8]
+                }
+            })
+        };
 
         poseidon2_permute(&mut state);
 
-        let mut new_left = if ignore_left_result {
+        let new_left = if ignore_left_result {
             Poseidon2HalfStateRef {
                 cs: cs.clone(),
                 value: std::array::from_fn(|i| state[i]),
@@ -296,12 +281,12 @@ impl Poseidon2HalfStateRef {
             wire: new_right.sel_value,
             hash: new_right.value,
         };
+        let swap_option = SwapOption {
+            addr: swap_bit_addr,
+            swap: swap_bit_val,
+        };
 
-        cs.invoke_poseidon_accelerator(entry_1, entry_2, entry_3, entry_4);
-
-        if !ignore_left_result {
-            new_left = &new_left + &left;
-        }
+        cs.invoke_poseidon_accelerator(entry_1, entry_2, entry_3, entry_4, swap_option);
 
         (new_left, new_right)
     }

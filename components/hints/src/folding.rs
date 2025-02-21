@@ -74,7 +74,7 @@ impl SinglePairMerkleProof {
                         .map_or(vec![], |v| v.to_m31_array().to_vec()),
                 );
                 sibling_hash = {
-                    let column_hash = Poseidon31MerkleHasher::hash_column(
+                    let column_hash = Poseidon31MerkleHasher::hash_column_get_capacity(
                         &self
                             .siblings_columns
                             .get(&h)
@@ -83,7 +83,7 @@ impl SinglePairMerkleProof {
                     let mut state = [M31::zero(); 16];
                     state[..8].copy_from_slice(&self.sibling_hashes[i].0);
                     state[8..].copy_from_slice(&column_hash.0);
-                    Poseidon31Hash(Poseidon31CRH::compress(&state))
+                    Poseidon31Hash(Poseidon31CRH::permute_get_rate(&state))
                 };
             }
         }
