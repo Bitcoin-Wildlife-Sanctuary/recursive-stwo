@@ -227,7 +227,7 @@ pub struct PlonkWithAcceleratorLookupElementsVar {
     pub cs: ConstraintSystemRef,
     pub z: QM31Var,
     pub alpha: QM31Var,
-    pub alpha_powers: [QM31Var; 9],
+    pub alpha_powers: [QM31Var; 3],
 }
 
 impl DVar for PlonkWithAcceleratorLookupElementsVar {
@@ -248,12 +248,12 @@ impl PlonkWithAcceleratorLookupElementsVar {
         alpha_powers.push(alpha.clone());
 
         let mut cur = alpha.clone();
-        for _ in 2..9 {
+        for _ in 2..3 {
             cur = &cur * &alpha;
             alpha_powers.push(cur.clone());
         }
 
-        let alpha_powers: [QM31Var; 9] = alpha_powers.try_into().unwrap();
+        let alpha_powers: [QM31Var; 3] = alpha_powers.try_into().unwrap();
 
         Self {
             cs,

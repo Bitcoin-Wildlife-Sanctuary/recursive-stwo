@@ -7,7 +7,7 @@ use circle_plonk_dsl_data_structures::{
 };
 use circle_plonk_dsl_fields::{M31Var, QM31Var};
 use circle_plonk_dsl_hints::FiatShamirHints;
-use stwo_prover::core::fields::m31::M31;
+use stwo_prover::core::fields::qm31::QM31;
 use stwo_prover::core::fields::FieldExpOps;
 use stwo_prover::core::pcs::PcsConfig;
 
@@ -126,12 +126,9 @@ impl FiatShamirResults {
         // enforce the total sum
         let mut input_sum = QM31Var::zero(&cs);
         for (idx, v) in inputs.iter() {
-            let v = v.decompose_m31();
-            let mut sum = &M31Var::new_constant(&cs, &M31::from(*idx as u32)) - &lookup_elements.z;
-            sum = &sum + &(&lookup_elements.alpha_powers[1] * &v[0]);
-            sum = &sum + &(&lookup_elements.alpha_powers[2] * &v[1]);
-            sum = &sum + &(&lookup_elements.alpha_powers[3] * &v[2]);
-            sum = &sum + &(&lookup_elements.alpha_powers[4] * &v[3]);
+            let sum = &(v + &(&QM31Var::new_constant(&cs, &QM31::from(*idx as u32))
+                * &lookup_elements.alpha))
+                - &lookup_elements.z;
             input_sum = &input_sum + &sum.inv();
         }
         (&(&input_sum + &proof.stmt1.poseidon_total_sum) + &proof.stmt1.plonk_total_sum)
@@ -139,7 +136,7 @@ impl FiatShamirResults {
 
         assert_eq!(lookup_elements.z.value, fiat_shamir_hints.z);
         assert_eq!(lookup_elements.alpha.value, fiat_shamir_hints.alpha);
-        for i in 0..9 {
+        for i in 0..3 {
             assert_eq!(
                 lookup_elements.alpha_powers[i].value,
                 fiat_shamir_hints.alpha.pow(i as u128)

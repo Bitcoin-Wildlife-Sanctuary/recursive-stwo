@@ -58,45 +58,23 @@ pub fn evaluate_plonk<'a>(
     eval.add_to_relation(RelationEntryVar::new(
         lookup_elements,
         mult_a,
-        &[
-            a_wire,
-            a_val_0.clone(),
-            a_val_1.clone(),
-            a_val_2.clone(),
-            a_val_3.clone(),
-        ],
+        &[a_val.clone(), a_wire.clone()],
     ));
     eval.add_to_relation(RelationEntryVar::new(
         lookup_elements,
         mult_b,
-        &[
-            b_wire,
-            b_val_0.clone(),
-            b_val_1.clone(),
-            b_val_2.clone(),
-            b_val_3.clone(),
-        ],
+        &[b_val.clone(), b_wire.clone()],
     ));
 
     eval.add_to_relation(RelationEntryVar::new(
         lookup_elements,
         mult_c,
-        &[c_wire.clone(), c_val_0, c_val_1, c_val_2, c_val_3],
+        &[c_val.clone(), c_wire.clone()],
     ));
     eval.add_to_relation(RelationEntryVar::new(
         lookup_elements,
         mult_poseidon.neg(),
-        &[
-            poseidon_wire,
-            a_val_0,
-            a_val_1,
-            a_val_2,
-            a_val_3,
-            b_val_0,
-            b_val_1,
-            b_val_2,
-            b_val_3,
-        ],
+        &[poseidon_wire, a_val, b_val],
     ));
 
     eval.finalize_logup_in_pairs();

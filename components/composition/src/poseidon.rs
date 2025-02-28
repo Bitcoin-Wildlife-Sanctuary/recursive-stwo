@@ -177,79 +177,63 @@ pub fn evaluate_poseidon<'a>(
 
     let sel = &is_external_idx_1_nonzero * &is_first_round;
     let id = &(&is_first_round * &external_idx_1) + &(&is_not_first_round * &in_left_id);
+
+    let a = &(&(&in_state[0] + &in_state[1].shift_by_i()) + &in_state[2].shift_by_j())
+        + &in_state[3].shift_by_ij();
+    let b = &(&(&in_state[4] + &in_state[5].shift_by_i()) + &in_state[6].shift_by_j())
+        + &in_state[7].shift_by_ij();
+
     eval.add_to_relation(RelationEntryVar::new(
         lookup_elements,
         &sel - &is_not_first_round,
-        &[
-            id,
-            in_state[0].clone(),
-            in_state[1].clone(),
-            in_state[2].clone(),
-            in_state[3].clone(),
-            in_state[4].clone(),
-            in_state[5].clone(),
-            in_state[6].clone(),
-            in_state[7].clone(),
-        ],
+        &[id, a, b],
     ));
 
     let sel = &is_external_idx_2_nonzero * &is_first_round;
     let id = &(&is_first_round * &external_idx_2) + &(&is_not_first_round * &in_right_id);
+
+    let a = &(&(&in_state[8] + &in_state[9].shift_by_i()) + &in_state[10].shift_by_j())
+        + &in_state[11].shift_by_ij();
+    let b = &(&(&in_state[12] + &in_state[13].shift_by_i()) + &in_state[14].shift_by_j())
+        + &in_state[15].shift_by_ij();
+
     eval.add_to_relation(RelationEntryVar::new(
         lookup_elements,
         &sel - &is_not_first_round,
-        &[
-            id.clone(),
-            in_state[8].clone(),
-            in_state[9].clone(),
-            in_state[10].clone(),
-            in_state[11].clone(),
-            in_state[12].clone(),
-            in_state[13].clone(),
-            in_state[14].clone(),
-            in_state[15].clone(),
-        ],
+        &[id, a, b],
     ));
 
     let sel = &is_external_idx_1_nonzero * &is_last_round;
     let id = &(&is_last_round * &external_idx_1) + &(&is_not_last_round * &out_left_id);
+
+    let a = &(&(&out_state[0] + &out_state[1].shift_by_i()) + &out_state[2].shift_by_j())
+        + &out_state[3].shift_by_ij();
+    let b = &(&(&out_state[4] + &out_state[5].shift_by_i()) + &out_state[6].shift_by_j())
+        + &out_state[7].shift_by_ij();
+
     eval.add_to_relation(RelationEntryVar::new(
         lookup_elements,
         &sel.clone() + &is_not_last_round,
-        &[
-            id.clone(),
-            out_state[0].clone(),
-            out_state[1].clone(),
-            out_state[2].clone(),
-            out_state[3].clone(),
-            out_state[4].clone(),
-            out_state[5].clone(),
-            out_state[6].clone(),
-            out_state[7].clone(),
-        ],
+        &[id.clone(), a, b],
     ));
 
     let sel = &is_external_idx_2_nonzero * &is_last_round;
     let id = &(&is_last_round * &external_idx_2) + &(&is_not_last_round * &out_right_id);
+
+    let a = &(&(&out_state[8] + &out_state[9].shift_by_i()) + &out_state[10].shift_by_j())
+        + &out_state[11].shift_by_ij();
+    let b = &(&(&out_state[12] + &out_state[13].shift_by_i()) + &out_state[14].shift_by_j())
+        + &out_state[15].shift_by_ij();
+
     eval.add_to_relation(RelationEntryVar::new(
         lookup_elements,
         &sel + &is_not_last_round,
-        &[
-            id.clone(),
-            out_state[8].clone(),
-            out_state[9].clone(),
-            out_state[10].clone(),
-            out_state[11].clone(),
-            out_state[12].clone(),
-            out_state[13].clone(),
-            out_state[14].clone(),
-            out_state[15].clone(),
-        ],
+        &[id.clone(), a, b],
     ));
     eval.add_to_relation(RelationEntryVar::new(
         lookup_elements,
         &is_first_round * &is_not_last_round,
-        &[swap_bit_addr, swap_bit_value],
+        &[swap_bit_value, swap_bit_addr],
     ));
 
     eval.finalize_logup(3);

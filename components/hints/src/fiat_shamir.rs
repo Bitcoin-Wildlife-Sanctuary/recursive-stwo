@@ -5,7 +5,7 @@ use stwo_prover::constraint_framework::{Relation, PREPROCESSED_TRACE_IDX};
 use stwo_prover::core::air::{Component, Components};
 use stwo_prover::core::channel::{Channel, Poseidon31Channel};
 use stwo_prover::core::circle::CirclePoint;
-use stwo_prover::core::fields::m31::M31;
+use stwo_prover::core::fields::m31::BaseField;
 use stwo_prover::core::fields::qm31::{SecureField, QM31};
 use stwo_prover::core::fields::secure_column::SECURE_EXTENSION_DEGREE;
 use stwo_prover::core::fields::FieldExpOps;
@@ -99,13 +99,12 @@ impl FiatShamirHints {
 
         let mut input_sum = SecureField::zero();
         for (idx, val) in inputs.iter() {
-            let sum: SecureField = lookup_elements.combine(&[
-                M31::from(*idx as u32),
-                val.0 .0,
-                val.0 .1,
-                val.1 .0,
-                val.1 .1,
-            ]);
+            let sum: SecureField = <PlonkWithAcceleratorLookupElements as Relation<
+                BaseField,
+                SecureField,
+            >>::combine_ef(
+                &lookup_elements, &[val.clone(), QM31::from(*idx as u32)]
+            );
             input_sum += sum.inverse();
         }
 
