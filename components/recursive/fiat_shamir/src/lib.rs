@@ -192,7 +192,7 @@ mod test {
     #[test]
     fn test_fiat_shamir() {
         let proof: PlonkWithPoseidonProof<Poseidon31MerkleHasher> =
-            bincode::deserialize(include_bytes!("../../test_data/small_proof.bin")).unwrap();
+            bincode::deserialize(include_bytes!("../../../test_data/small_proof.bin")).unwrap();
         let config = PcsConfig {
             pow_bits: 20,
             fri_config: FriConfig::new(0, 5, 16),
@@ -200,7 +200,7 @@ mod test {
 
         let fiat_shamir_hints = FiatShamirHints::new(&proof, config, &[(1, QM31::one())]);
 
-        let cs = ConstraintSystemRef::new_ref();
+        let cs = ConstraintSystemRef::new_qm31_ref();
         let mut proof_var = PlonkWithPoseidonProofVar::new_witness(&cs, &proof);
 
         let _results = FiatShamirResults::compute(
@@ -215,7 +215,7 @@ mod test {
         cs.populate_logup_arguments();
         cs.check_poseidon_invocations();
 
-        let (plonk, mut poseidon) = cs.generate_circuit();
+        let (plonk, mut poseidon) = cs.generate_qm31_circuit();
         let proof =
             prove_plonk_with_poseidon::<Poseidon31MerkleChannel>(config, &plonk, &mut poseidon);
         verify_plonk_with_poseidon::<Poseidon31MerkleChannel>(

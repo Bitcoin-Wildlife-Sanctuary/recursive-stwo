@@ -1,0 +1,19 @@
+[package]
+name = "circle-plonk-dsl-answer"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+stwo-prover.workspace = true
+circle-plonk-dsl-fiat-shamir = { path = "../fiat_shamir" }
+circle-plonk-dsl-circle = { path = "../../../primitives/circle" }
+circle-plonk-dsl-hints = { path = "../../hints" }
+circle-plonk-dsl-fields = { path = "../../../primitives/fields" }
+circle-plonk-dsl-data-structures = { path = "../data_structures" }
+circle-plonk-dsl-constraint-system = { path = "../../../dsl/constraint_system" }
+circle-plonk-dsl-bits = { path = "../../../primitives/bits" }
+circle-plonk-dsl-query = { path = "../../../primitives/query" }
+bincode.workspace = true
+num-traits.workspace = true
+itertools.workspace = true
+indexmap.workspace = true

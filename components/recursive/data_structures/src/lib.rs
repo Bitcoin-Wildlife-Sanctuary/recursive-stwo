@@ -535,7 +535,7 @@ mod test {
     #[test]
     fn test_merkle_path_proof() {
         let proof: PlonkWithPoseidonProof<Poseidon31MerkleHasher> =
-            bincode::deserialize(include_bytes!("../../test_data/small_proof.bin")).unwrap();
+            bincode::deserialize(include_bytes!("../../../test_data/small_proof.bin")).unwrap();
         let config = PcsConfig {
             pow_bits: 20,
             fri_config: FriConfig::new(0, 5, 16),
@@ -562,7 +562,7 @@ mod test {
             proof.verify();
         }
 
-        let cs = ConstraintSystemRef::new_ref();
+        let cs = ConstraintSystemRef::new_qm31_ref();
         let root = HashVar::new_witness(&cs, &proof.stark_proof.commitments[0].0);
         for proof in proofs.iter() {
             let mut proof_var = SinglePathMerkleProofVar::new(&cs, proof);
@@ -575,7 +575,7 @@ mod test {
     #[test]
     fn test_merkle_pair_proof() {
         let proof: PlonkWithPoseidonProof<Poseidon31MerkleHasher> =
-            bincode::deserialize(include_bytes!("../../test_data/small_proof.bin")).unwrap();
+            bincode::deserialize(include_bytes!("../../../test_data/small_proof.bin")).unwrap();
         let config = PcsConfig {
             pow_bits: 20,
             fri_config: FriConfig::new(0, 5, 16),
@@ -588,7 +588,7 @@ mod test {
             proof.verify();
         }
 
-        let cs = ConstraintSystemRef::new_ref();
+        let cs = ConstraintSystemRef::new_qm31_ref();
         let root = HashVar::new_witness(&cs, &proof.stark_proof.fri_proof.first_layer.commitment.0);
         for proof in first_layer_hints.merkle_proofs.iter() {
             let mut proof_var = SinglePairMerkleProofVar::new(&cs, proof);

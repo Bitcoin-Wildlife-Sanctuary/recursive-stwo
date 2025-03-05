@@ -7,7 +7,6 @@ edition = "2021"
 stwo-prover.workspace = true
 num-traits.workspace = true
 itertools.workspace = true
-log = "0.4.25"
 
 [dev-dependencies]
 bincode.workspace = true

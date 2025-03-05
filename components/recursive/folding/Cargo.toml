@@ -5,12 +5,12 @@ edition = "2021"
 
 [dependencies]
 circle-plonk-dsl-answer = { path = "../answer" }
-circle-plonk-dsl-hints = { path = "../hints" }
+circle-plonk-dsl-hints = { path = "../../hints" }
 circle-plonk-dsl-fiat-shamir = { path = "../fiat_shamir" }
-circle-plonk-dsl-circle = { path = "../../primitives/circle" }
-circle-plonk-dsl-constraint-system = { path = "../../dsl/constraint_system" }
+circle-plonk-dsl-circle = { path = "../../../primitives/circle" }
+circle-plonk-dsl-constraint-system = { path = "../../../dsl/constraint_system" }
 circle-plonk-dsl-data-structures = { path = "../data_structures" }
-circle-plonk-dsl-fields = { path = "../../primitives/fields" }
+circle-plonk-dsl-fields = { path = "../../../primitives/fields" }
 num-traits.workspace = true
 stwo-prover.workspace = true
 bincode.workspace = true

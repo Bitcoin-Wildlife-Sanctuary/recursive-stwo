@@ -178,8 +178,8 @@ pub struct CirclePointQM31Var {
 impl CirclePointQM31Var {
     pub fn value(&self) -> CirclePoint<QM31> {
         CirclePoint::<QM31> {
-            x: self.x.value,
-            y: self.y.value,
+            x: self.x.value(),
+            y: self.y.value(),
         }
     }
 }
@@ -258,7 +258,7 @@ mod test {
         let a = circle_domain.at(bit_reverse_index(40, 16));
         let b = circle_domain.at(bit_reverse_index(41, 16));
 
-        let cs = ConstraintSystemRef::new_ref();
+        let cs = ConstraintSystemRef::new_qm31_ref();
 
         let a_index = M31Var::new_witness(&cs, &M31::from(40));
         let b_index = M31Var::new_witness(&cs, &M31::from(41));

@@ -3,13 +3,14 @@ use num_traits::{One, Zero};
 use std::cell::RefCell;
 use std::cmp::max;
 use std::collections::HashMap;
-use std::ops::Neg;
+use std::ops::{Deref, DerefMut, Neg};
 use std::rc::Rc;
 use stwo_prover::core::backend::simd::m31::N_LANES;
 use stwo_prover::core::backend::Column;
 use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::fields::qm31::QM31;
 use stwo_prover::core::vcs::poseidon31_ref::poseidon2_permute;
+use stwo_prover::examples::plonk::PlonkCircuitTrace;
 use stwo_prover::examples::plonk_with_poseidon::plonk::PlonkWithAcceleratorCircuitTrace;
 use stwo_prover::examples::plonk_with_poseidon::poseidon::{
     PoseidonEntry, PoseidonFlow, SwapOption, CONSTANT_1, CONSTANT_2, CONSTANT_3,
@@ -17,30 +18,69 @@ use stwo_prover::examples::plonk_with_poseidon::poseidon::{
 
 pub mod dvar;
 
+#[derive(Debug)]
+pub enum ConstraintSystemEnum {
+    QM31(QM31ConstraintSystem),
+    M31(M31ConstraintSystem),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConstraintSystemType {
+    QM31,
+    M31,
+}
+
 /// A shared reference to a constraint system that can be stored in high level
 /// variables.
 #[derive(Clone, Debug)]
-pub struct ConstraintSystemRef(pub(crate) Rc<RefCell<ConstraintSystem>>);
+pub struct ConstraintSystemRef(pub(crate) Rc<RefCell<ConstraintSystemEnum>>);
 
 impl ConstraintSystemRef {
-    pub fn new_ref() -> Self {
-        Self(Rc::new(RefCell::new(ConstraintSystem::new())))
+    pub fn new_qm31_ref() -> Self {
+        Self(Rc::new(RefCell::new(ConstraintSystemEnum::QM31(
+            QM31ConstraintSystem::new(),
+        ))))
+    }
+
+    pub fn get_type(&self) -> ConstraintSystemType {
+        match self.0.borrow().deref() {
+            ConstraintSystemEnum::QM31(_) => ConstraintSystemType::QM31,
+            ConstraintSystemEnum::M31(_) => ConstraintSystemType::M31,
+        }
     }
 
     pub fn get_cache(&self, str: impl ToString) -> Option<usize> {
-        self.0.borrow().cache.get(&str.to_string()).cloned()
+        match self.0.borrow().deref() {
+            ConstraintSystemEnum::QM31(cs) => cs.cache.get(&str.to_string()).cloned(),
+            ConstraintSystemEnum::M31(cs) => cs.cache.get(&str.to_string()).cloned(),
+        }
     }
 
     pub fn set_cache(&self, str: impl ToString, range: usize) {
-        self.0.borrow_mut().cache.insert(str.to_string(), range);
+        match self.0.borrow_mut().deref_mut() {
+            ConstraintSystemEnum::QM31(cs) => {
+                cs.cache.insert(str.to_string(), range);
+            }
+            ConstraintSystemEnum::M31(cs) => {
+                cs.cache.insert(str.to_string(), range);
+            }
+        }
     }
 
     pub fn new_m31(&self, variables: M31, mode: AllocationMode) -> usize {
-        self.0.borrow_mut().new_m31(variables, mode)
+        match self.0.borrow_mut().deref_mut() {
+            ConstraintSystemEnum::QM31(cs) => cs.new_m31(variables, mode),
+            ConstraintSystemEnum::M31(cs) => cs.new_m31(variables, mode),
+        }
     }
 
     pub fn new_qm31(&self, variable: QM31, mode: AllocationMode) -> usize {
-        self.0.borrow_mut().new_qm31(variable, mode)
+        match self.0.borrow_mut().deref_mut() {
+            ConstraintSystemEnum::QM31(cs) => cs.new_qm31(variable, mode),
+            ConstraintSystemEnum::M31(_) => {
+                unimplemented!()
+            }
+        }
     }
 
     pub fn and(&self, other: &Self) -> Self {
@@ -49,35 +89,65 @@ impl ConstraintSystemRef {
     }
 
     pub fn insert_gate(&self, a_wire: usize, b_wire: usize, c_wire: usize, op: M31) {
-        self.0.borrow_mut().insert_gate(a_wire, b_wire, c_wire, op)
+        match self.0.borrow_mut().deref_mut() {
+            ConstraintSystemEnum::QM31(cs) => cs.insert_gate(a_wire, b_wire, c_wire, op),
+            ConstraintSystemEnum::M31(cs) => cs.insert_gate(a_wire, b_wire, c_wire, op),
+        }
     }
 
     pub fn add(&self, a_wire: usize, b_wire: usize) -> usize {
-        self.0.borrow_mut().add(a_wire, b_wire)
+        match self.0.borrow_mut().deref_mut() {
+            ConstraintSystemEnum::QM31(cs) => cs.add(a_wire, b_wire),
+            ConstraintSystemEnum::M31(cs) => cs.add(a_wire, b_wire),
+        }
     }
 
     pub fn mul(&self, a_wire: usize, b_wire: usize) -> usize {
-        self.0.borrow_mut().mul(a_wire, b_wire)
+        match self.0.borrow_mut().deref_mut() {
+            ConstraintSystemEnum::QM31(cs) => cs.mul(a_wire, b_wire),
+            ConstraintSystemEnum::M31(cs) => cs.mul(a_wire, b_wire),
+        }
     }
 
     pub fn mul_constant(&self, a_wire: usize, constant: M31) -> usize {
-        self.0.borrow_mut().mul_constant(a_wire, constant)
+        match self.0.borrow_mut().deref_mut() {
+            ConstraintSystemEnum::QM31(cs) => cs.mul_constant(a_wire, constant),
+            ConstraintSystemEnum::M31(cs) => cs.mul_constant(a_wire, constant),
+        }
     }
 
     pub fn enforce_zero(&self, var: usize) {
-        self.0.borrow_mut().enforce_zero(var);
+        match self.0.borrow_mut().deref_mut() {
+            ConstraintSystemEnum::QM31(cs) => {
+                cs.enforce_zero(var);
+            }
+            ConstraintSystemEnum::M31(cs) => {
+                cs.enforce_zero(var);
+            }
+        }
     }
 
     pub fn check_arithmetics(&self) {
-        self.0.borrow().check_arithmetics();
+        match self.0.borrow().deref() {
+            ConstraintSystemEnum::QM31(cs) => cs.check_arithmetics(),
+            ConstraintSystemEnum::M31(cs) => cs.check_arithmetics(),
+        }
     }
 
     pub fn populate_logup_arguments(&self) {
-        self.0.borrow_mut().populate_logup_arguments();
+        match self.0.borrow_mut().deref_mut() {
+            ConstraintSystemEnum::QM31(cs) => cs.populate_logup_arguments(),
+            ConstraintSystemEnum::M31(cs) => cs.populate_logup_arguments(),
+        }
     }
 
     pub fn check_poseidon_invocations(&self) {
-        self.0.borrow().check_poseidon_invocations();
+        match self.0.borrow().deref() {
+            ConstraintSystemEnum::QM31(cs) => cs.check_poseidon_invocations(),
+            ConstraintSystemEnum::M31(_) => {
+                unimplemented!()
+            }
+        }
     }
 
     pub fn invoke_poseidon_accelerator(
@@ -88,34 +158,64 @@ impl ConstraintSystemRef {
         entry_4: PoseidonEntry,
         swap_option: SwapOption,
     ) {
-        self.0.borrow_mut().invoke_poseidon_accelerator(
-            entry_1,
-            entry_2,
-            entry_3,
-            entry_4,
-            swap_option,
-        );
+        match self.0.borrow_mut().deref_mut() {
+            ConstraintSystemEnum::QM31(cs) => {
+                cs.invoke_poseidon_accelerator(entry_1, entry_2, entry_3, entry_4, swap_option);
+            }
+            ConstraintSystemEnum::M31(_) => {
+                unimplemented!()
+            }
+        }
     }
 
     pub fn pad(&self) {
-        self.0.borrow_mut().pad();
+        match self.0.borrow_mut().deref_mut() {
+            ConstraintSystemEnum::QM31(cs) => {
+                cs.pad();
+            }
+            ConstraintSystemEnum::M31(cs) => {
+                cs.pad();
+            }
+        }
     }
 
-    pub fn generate_circuit(&self) -> (PlonkWithAcceleratorCircuitTrace, PoseidonFlow) {
-        self.0.borrow().generate_circuit()
+    pub fn generate_qm31_circuit(&self) -> (PlonkWithAcceleratorCircuitTrace, PoseidonFlow) {
+        match self.0.borrow_mut().deref_mut() {
+            ConstraintSystemEnum::QM31(cs) => cs.generate_qm31_circuit(),
+            ConstraintSystemEnum::M31(cs) => {
+                unimplemented!()
+            }
+        }
+    }
+
+    pub fn generate_m31_circuit(&self) -> PlonkCircuitTrace {
+        match self.0.borrow_mut().deref_mut() {
+            ConstraintSystemEnum::QM31(_) => {
+                unimplemented!()
+            }
+            ConstraintSystemEnum::M31(cs) => cs.generate_m31_circuit(),
+        }
     }
 
     pub fn num_plonk_rows(&self) -> usize {
-        self.0.borrow().a_wire.len()
+        match self.0.borrow_mut().deref_mut() {
+            ConstraintSystemEnum::QM31(cs) => cs.a_wire.len(),
+            ConstraintSystemEnum::M31(cs) => cs.a_wire.len(),
+        }
     }
 
     pub fn assemble_poseidon_gate(&self, a_wire: usize, b_wire: usize) -> usize {
-        self.0.borrow_mut().assemble_poseidon_gate(a_wire, b_wire)
+        match self.0.borrow_mut().deref_mut() {
+            ConstraintSystemEnum::QM31(cs) => cs.assemble_poseidon_gate(a_wire, b_wire),
+            ConstraintSystemEnum::M31(_) => {
+                unimplemented!()
+            }
+        }
     }
 }
 
 #[derive(Debug)]
-pub struct ConstraintSystem {
+pub struct QM31ConstraintSystem {
     pub variables: Vec<QM31>,
 
     pub cache: HashMap<String, usize>,
@@ -148,7 +248,7 @@ impl PartialEq for ConstraintSystemRef {
 
 pub const LOG_CONSTRAINT_SYSTEM_RESERVED_SIZE: usize = 16;
 
-impl ConstraintSystem {
+impl QM31ConstraintSystem {
     pub fn new() -> Self {
         let mut cs = Self {
             variables: Vec::with_capacity(1 << LOG_CONSTRAINT_SYSTEM_RESERVED_SIZE),
@@ -625,7 +725,7 @@ impl ConstraintSystem {
         }
     }
 
-    pub fn generate_circuit(&self) -> (PlonkWithAcceleratorCircuitTrace, PoseidonFlow) {
+    pub fn generate_qm31_circuit(&self) -> (PlonkWithAcceleratorCircuitTrace, PoseidonFlow) {
         assert!(self.a_wire.len().is_power_of_two());
         assert!(self.a_wire.len() >= N_LANES);
         assert!(!self.mult_a.is_empty());
@@ -730,5 +830,262 @@ impl ConstraintSystem {
         );
 
         (circuit, self.flow.clone())
+    }
+}
+
+#[derive(Debug)]
+pub struct M31ConstraintSystem {
+    pub variables: Vec<M31>,
+
+    pub cache: HashMap<String, usize>,
+
+    pub a_wire: Vec<usize>,
+    pub b_wire: Vec<usize>,
+    pub c_wire: Vec<usize>,
+
+    pub mult_c: Vec<isize>,
+    pub op: Vec<M31>,
+
+    pub num_input: usize,
+    pub is_program_started: bool,
+}
+
+impl M31ConstraintSystem {
+    pub fn new() -> Self {
+        let mut cs = Self {
+            variables: Vec::with_capacity(1 << LOG_CONSTRAINT_SYSTEM_RESERVED_SIZE),
+            cache: HashMap::new(),
+            a_wire: Vec::with_capacity(1 << LOG_CONSTRAINT_SYSTEM_RESERVED_SIZE),
+            b_wire: Vec::with_capacity(1 << LOG_CONSTRAINT_SYSTEM_RESERVED_SIZE),
+            c_wire: Vec::with_capacity(1 << LOG_CONSTRAINT_SYSTEM_RESERVED_SIZE),
+            mult_c: vec![],
+            op: Vec::with_capacity(1 << LOG_CONSTRAINT_SYSTEM_RESERVED_SIZE),
+            num_input: 0,
+            is_program_started: false,
+        };
+
+        cs.variables.push(M31::zero());
+        cs.variables.push(M31::zero());
+
+        cs.a_wire.push(0);
+        cs.b_wire.push(0);
+        cs.c_wire.push(0);
+        cs.op.push(M31::one());
+
+        cs.a_wire.push(1);
+        cs.b_wire.push(0);
+        cs.c_wire.push(1);
+        cs.op.push(M31::one());
+
+        cs.num_input = 1;
+
+        cs
+    }
+
+    pub fn insert_gate(&mut self, a_wire: usize, b_wire: usize, c_wire: usize, op: M31) {
+        self.is_program_started = true;
+        let id = self.variables.len();
+
+        self.a_wire.push(a_wire);
+        self.b_wire.push(b_wire);
+        self.c_wire.push(c_wire);
+        self.op.push(op);
+
+        assert!(a_wire < id);
+        assert!(b_wire < id);
+        assert!(c_wire < id);
+    }
+
+    pub fn enforce_zero(&mut self, var: usize) {
+        self.is_program_started = true;
+
+        self.a_wire.push(var);
+        self.b_wire.push(0);
+        self.c_wire.push(0);
+        self.op.push(M31::one());
+    }
+
+    pub fn add(&mut self, a_wire: usize, b_wire: usize) -> usize {
+        let a_val = self.variables[a_wire];
+        let b_val = self.variables[b_wire];
+
+        let c_wire = self.variables.len();
+        self.variables.push(a_val + b_val);
+
+        self.insert_gate(a_wire, b_wire, c_wire, M31::zero());
+        c_wire
+    }
+
+    pub fn mul(&mut self, a_wire: usize, b_wire: usize) -> usize {
+        let a_val = self.variables[a_wire];
+        let b_val = self.variables[b_wire];
+
+        let c_wire = self.variables.len();
+        self.variables.push(a_val * b_val);
+
+        self.insert_gate(a_wire, b_wire, c_wire, M31::zero());
+        c_wire
+    }
+
+    pub fn mul_constant(&mut self, a_wire: usize, constant: M31) -> usize {
+        let a_val = self.variables[a_wire];
+
+        let c_wire = self.variables.len();
+        self.variables.push(a_val * constant);
+
+        self.insert_gate(a_wire, 0, c_wire, constant);
+        c_wire
+    }
+
+    pub fn new_m31(&mut self, variable: M31, mode: AllocationMode) -> usize {
+        let c_wire = self.variables.len();
+        self.variables.push(variable);
+
+        match mode {
+            AllocationMode::PublicInput => {
+                assert!(!self.is_program_started);
+
+                self.a_wire.push(c_wire);
+                self.b_wire.push(0);
+                self.c_wire.push(c_wire);
+                self.op.push(M31::one());
+
+                self.num_input += 1;
+            }
+            AllocationMode::Witness => {
+                self.is_program_started = true;
+
+                self.a_wire.push(c_wire);
+                self.b_wire.push(0);
+                self.c_wire.push(c_wire);
+                self.op.push(M31::one());
+            }
+            AllocationMode::Constant => {
+                self.is_program_started = true;
+
+                self.a_wire.push(1);
+                self.b_wire.push(0);
+                self.c_wire.push(c_wire);
+                self.op.push(variable);
+            }
+        }
+
+        c_wire
+    }
+
+    pub fn pad(&mut self) {
+        println!("Before padding: Plonk circuit size: {}", self.a_wire.len(),);
+        assert!(self.mult_c.is_empty());
+
+        let plonk_len = self.a_wire.len();
+        let padded_plonk_len = plonk_len.next_power_of_two();
+
+        for _ in plonk_len..padded_plonk_len {
+            self.a_wire.push(0);
+            self.b_wire.push(0);
+            self.c_wire.push(0);
+            self.op.push(M31::one());
+        }
+    }
+
+    pub fn check_arithmetics(&self) {
+        assert!(self.mult_c.is_empty());
+
+        assert_eq!(self.a_wire.len(), self.b_wire.len());
+        assert_eq!(self.a_wire.len(), self.c_wire.len());
+        assert_eq!(self.a_wire.len(), self.op.len());
+
+        let len = self.a_wire.len();
+
+        for i in 0..len {
+            assert_eq!(
+                self.variables[self.c_wire[i]],
+                self.op[i] * (self.variables[self.a_wire[i]] + self.variables[self.b_wire[i]])
+                    + (M31::one() - self.op[i])
+                        * self.variables[self.a_wire[i]]
+                        * self.variables[self.b_wire[i]],
+                "Row {} is incorrect:\n - a_val = {},  b_val = {}, c_val = {}\
+                \n - a_wire = {}, b_wire = {}, c_wire = {}, op = {}",
+                i,
+                self.variables[self.a_wire[i]],
+                self.variables[self.b_wire[i]],
+                self.variables[self.c_wire[i]],
+                self.a_wire[i],
+                self.b_wire[i],
+                self.c_wire[i],
+                self.op[i]
+            );
+        }
+    }
+
+    pub fn populate_logup_arguments(&mut self) {
+        assert!(self.mult_c.is_empty());
+
+        let n_vars = self.variables.len();
+        let mut counts = Vec::new();
+        counts.resize(n_vars, 0isize);
+
+        let n_rows = self.a_wire.len();
+        assert!(n_rows.is_power_of_two());
+
+        for i in 0..n_rows {
+            counts[self.a_wire[i]] += 1;
+            counts[self.b_wire[i]] += 1;
+            counts[self.c_wire[i]] += 1;
+        }
+
+        let mut first_occurred = vec![false; n_vars];
+        let mut mult_c = Vec::with_capacity(n_vars);
+        for i in 0..self.num_input {
+            if first_occurred[self.c_wire[i]] {
+                mult_c.push(counts[self.c_wire[i]] - 1);
+            } else {
+                mult_c.push(-1);
+            }
+        }
+        self.mult_c = mult_c;
+    }
+
+    pub fn generate_m31_circuit(&self) -> PlonkCircuitTrace {
+        assert!(self.a_wire.len().is_power_of_two());
+        assert!(self.a_wire.len() >= N_LANES);
+        assert!(!self.mult_c.is_empty());
+
+        let log_n_rows = self.a_wire.len().ilog2();
+        let range = 0..(1 << log_n_rows);
+        let isize_to_m31 = |v: isize| {
+            if v.is_negative() {
+                M31::from((-v) as u32).neg()
+            } else {
+                M31::from(v as u32)
+            }
+        };
+
+        let circuit = PlonkCircuitTrace {
+            mult: range
+                .clone()
+                .map(|i| isize_to_m31(self.mult_c[i]))
+                .collect(),
+            a_wire: range.clone().map(|i| self.a_wire[i].into()).collect(),
+            b_wire: range.clone().map(|i| self.b_wire[i].into()).collect(),
+            c_wire: range.clone().map(|i| self.c_wire[i].into()).collect(),
+            op: range.clone().map(|i| self.op[i].into()).collect(),
+            a_val: range
+                .clone()
+                .map(|i| self.variables[self.a_wire[i]].into())
+                .collect(),
+            b_val: range
+                .clone()
+                .map(|i| self.variables[self.b_wire[i]].into())
+                .collect(),
+            c_val: range
+                .clone()
+                .map(|i| self.variables[self.c_wire[i]].into())
+                .collect(),
+        };
+
+        println!("Plonk circuit size: {}", circuit.mult.len());
+
+        circuit
     }
 }

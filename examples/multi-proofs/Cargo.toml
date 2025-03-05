@@ -4,15 +4,16 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-circle-plonk-dsl-composition = { path = "../../components/composition" }
-circle-plonk-dsl-answer = { path = "../../components/answer" }
+circle-plonk-dsl-composition = { path = "../../components/recursive/composition" }
+circle-plonk-dsl-answer = { path = "../../components/recursive/answer" }
 circle-plonk-dsl-hints = { path = "../../components/hints" }
-circle-plonk-dsl-folding = { path = "../../components/folding" }
-circle-plonk-dsl-data-structures = { path = "../../components/data_structures" }
-circle-plonk-dsl-fiat-shamir = { path = "../../components/fiat_shamir" }
+circle-plonk-dsl-folding = { path = "../../components/recursive/folding" }
+circle-plonk-dsl-data-structures = { path = "../../components/recursive/data_structures" }
+circle-plonk-dsl-fiat-shamir = { path = "../../components/recursive/fiat_shamir" }
 stwo-prover.workspace = true
 bincode.workspace = true
 circle-plonk-dsl-constraint-system = { path = "../../dsl/constraint_system" }
 circle-plonk-dsl-circle = { path = "../../primitives/circle" }
 circle-plonk-dsl-fields = { path = "../../primitives/fields" }
 num-traits.workspace = true
+serde.workspace = true
