@@ -134,23 +134,23 @@ impl FiatShamirResults {
         (&(&input_sum + &proof.stmt1.poseidon_total_sum) + &proof.stmt1.plonk_total_sum)
             .equalverify(&QM31Var::zero(&cs));
 
-        assert_eq!(lookup_elements.z.value, fiat_shamir_hints.z);
-        assert_eq!(lookup_elements.alpha.value, fiat_shamir_hints.alpha);
+        assert_eq!(lookup_elements.z.value(), fiat_shamir_hints.z);
+        assert_eq!(lookup_elements.alpha.value(), fiat_shamir_hints.alpha);
         for i in 0..3 {
             assert_eq!(
-                lookup_elements.alpha_powers[i].value,
+                lookup_elements.alpha_powers[i].value(),
                 fiat_shamir_hints.alpha.pow(i as u128)
             );
         }
-        assert_eq!(random_coeff.value, fiat_shamir_hints.random_coeff);
-        assert_eq!(oods_point.x.value, fiat_shamir_hints.oods_point.x);
-        assert_eq!(oods_point.y.value, fiat_shamir_hints.oods_point.y);
+        assert_eq!(random_coeff.value(), fiat_shamir_hints.random_coeff);
+        assert_eq!(oods_point.x.value(), fiat_shamir_hints.oods_point.x);
+        assert_eq!(oods_point.y.value(), fiat_shamir_hints.oods_point.y);
         assert_eq!(
-            after_sampled_values_random_coeff.value,
+            after_sampled_values_random_coeff.value(),
             fiat_shamir_hints.after_sampled_values_random_coeff
         );
         for (l, r) in fri_alphas.iter().zip(fiat_shamir_hints.fri_alphas.iter()) {
-            assert_eq!(l.value, *r);
+            assert_eq!(l.value(), *r);
         }
 
         Self {

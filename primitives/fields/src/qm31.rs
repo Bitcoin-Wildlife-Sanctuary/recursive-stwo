@@ -428,7 +428,7 @@ impl QM31Var {
 
     pub fn decompose_cm31(&self) -> [CM31Var; 2] {
         match self {
-            QM31Var::Native(var) => {
+            QM31Var::Native(_) => {
                 let v = self.decompose_m31();
 
                 let a0 = &CM31Var::from(&v[1]).shift_by_i() + &v[0];

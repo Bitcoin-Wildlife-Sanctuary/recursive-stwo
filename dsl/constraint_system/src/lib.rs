@@ -182,7 +182,7 @@ impl ConstraintSystemRef {
     pub fn generate_qm31_circuit(&self) -> (PlonkWithAcceleratorCircuitTrace, PoseidonFlow) {
         match self.0.borrow_mut().deref_mut() {
             ConstraintSystemEnum::QM31(cs) => cs.generate_qm31_circuit(),
-            ConstraintSystemEnum::M31(cs) => {
+            ConstraintSystemEnum::M31(_) => {
                 unimplemented!()
             }
         }
@@ -1037,8 +1037,9 @@ impl M31ConstraintSystem {
         let mut first_occurred = vec![false; n_vars];
         let mut mult_c = Vec::with_capacity(n_vars);
         for i in 0..self.num_input {
-            if first_occurred[self.c_wire[i]] {
+            if !first_occurred[self.c_wire[i]] {
                 mult_c.push(counts[self.c_wire[i]] - 1);
+                first_occurred[self.c_wire[i]] = true;
             } else {
                 mult_c.push(-1);
             }

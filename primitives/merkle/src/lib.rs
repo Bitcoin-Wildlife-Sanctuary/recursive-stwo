@@ -9,55 +9,17 @@ impl Poseidon31MerkleHasherVar {
     pub fn hash_qm31_columns_get_rate(qm31: &[QM31Var]) -> Poseidon2HalfVar {
         assert_eq!(qm31.len(), 2);
 
-        let cs = qm31[0].cs.and(&qm31[1].cs);
-        let left_value = qm31[0].value.to_m31_array();
-        let right_value = qm31[1].value.to_m31_array();
-        let left_variable = qm31[0].variable;
-        let right_variable = qm31[1].variable;
-        let half_state_variable = cs.assemble_poseidon_gate(left_variable, right_variable);
-
-        let left = Poseidon2HalfVar {
-            cs: cs.clone(),
-            value: std::array::from_fn(|i| {
-                if i < 4 {
-                    left_value[i]
-                } else {
-                    right_value[i - 4]
-                }
-            }),
-            left_variable,
-            right_variable,
-            sel_value: half_state_variable,
-        };
-
+        let cs = qm31[0].cs().and(&qm31[1].cs());
+        let left = Poseidon2HalfVar::from_qm31(&qm31[0], &qm31[1]);
         let zero = Poseidon2HalfVar::zero(&cs);
         Poseidon2HalfVar::permute_get_rate(&left, &zero)
     }
 
-    pub fn hash_qm31_columns_get_capacity(qm31: &[QM31Var]) -> Poseidon2HalfStateRef {
+    pub fn hash_qm31_columns_get_capacity(qm31: &[QM31Var]) -> Poseidon2HalfVar {
         assert_eq!(qm31.len(), 2);
 
-        let cs = qm31[0].cs.and(&qm31[1].cs);
-        let left_value = qm31[0].value.to_m31_array();
-        let right_value = qm31[1].value.to_m31_array();
-        let left_variable = qm31[0].variable;
-        let right_variable = qm31[1].variable;
-        let half_state_variable = cs.assemble_poseidon_gate(left_variable, right_variable);
-
-        let left = Poseidon2HalfVar {
-            cs: cs.clone(),
-            value: std::array::from_fn(|i| {
-                if i < 4 {
-                    left_value[i]
-                } else {
-                    right_value[i - 4]
-                }
-            }),
-            left_variable,
-            right_variable,
-            sel_value: half_state_variable,
-        };
-
+        let cs = qm31[0].cs().and(&qm31[1].cs());
+        let left = Poseidon2HalfVar::from_qm31(&qm31[0], &qm31[1]);
         let zero = Poseidon2HalfVar::zero(&cs);
         Poseidon2HalfVar::permute_get_capacity(&left, &zero)
     }
@@ -194,7 +156,7 @@ mod test {
     use circle_plonk_dsl_constraint_system::dvar::AllocVar;
     use circle_plonk_dsl_constraint_system::ConstraintSystemRef;
     use circle_plonk_dsl_fields::M31Var;
-    use circle_plonk_dsl_poseidon31::Poseidon2HalfStateRef;
+    use circle_plonk_dsl_poseidon31::Poseidon2HalfVar;
     use num_traits::One;
     use rand::rngs::SmallRng;
     use rand::{Rng, SeedableRng};
@@ -225,51 +187,57 @@ mod test {
         // test 7
         let a = Poseidon31MerkleHasherVar::hash_m31_columns_get_rate(&test_var[0..7]);
         let b = Poseidon31MerkleHasher::hash_node(None, &test[0..7]);
+        let a_val = a.value();
         for i in 0..8 {
-            assert_eq!(a.value[i], b.0[i]);
+            assert_eq!(a_val[i], b.0[i]);
         }
 
         // test 13
         let a = Poseidon31MerkleHasherVar::hash_m31_columns_get_rate(&test_var[0..13]);
         let b = Poseidon31MerkleHasher::hash_node(None, &test[0..13]);
+        let a_val = a.value();
         for i in 0..8 {
-            assert_eq!(a.value[i], b.0[i]);
+            assert_eq!(a_val[i], b.0[i]);
         }
 
         // test 16
         let a = Poseidon31MerkleHasherVar::hash_m31_columns_get_rate(&test_var[0..16]);
         let b = Poseidon31MerkleHasher::hash_node(None, &test[0..16]);
+        let a_val = a.value();
         for i in 0..8 {
-            assert_eq!(a.value[i], b.0[i]);
+            assert_eq!(a_val[i], b.0[i]);
         }
 
         // test 17
         let a = Poseidon31MerkleHasherVar::hash_m31_columns_get_rate(&test_var[0..17]);
         let b = Poseidon31MerkleHasher::hash_node(None, &test[0..17]);
+        let a_val = a.value();
         for i in 0..8 {
-            assert_eq!(a.value[i], b.0[i]);
+            assert_eq!(a_val[i], b.0[i]);
         }
 
         // test 21
         let a = Poseidon31MerkleHasherVar::hash_m31_columns_get_rate(&test_var[0..21]);
         let b = Poseidon31MerkleHasher::hash_node(None, &test[0..21]);
+        let a_val = a.value();
         for i in 0..8 {
-            assert_eq!(a.value[i], b.0[i]);
+            assert_eq!(a_val[i], b.0[i]);
         }
 
         // test 25
         let a = Poseidon31MerkleHasherVar::hash_m31_columns_get_rate(&test_var[0..25]);
         let b = Poseidon31MerkleHasher::hash_node(None, &test[0..25]);
+        let a_val = a.value();
         for i in 0..8 {
-            assert_eq!(a.value[i], b.0[i]);
+            assert_eq!(a_val[i], b.0[i]);
         }
 
         let test_hash_left: [M31; 8] = prng.gen();
         let test_hash_right: [M31; 8] = prng.gen();
         let test_hash_column: [M31; 8] = prng.gen();
 
-        let test_hash_left_var = Poseidon2HalfStateRef::new_witness(&cs, &test_hash_left);
-        let test_hash_right_var = Poseidon2HalfStateRef::new_witness(&cs, &test_hash_right);
+        let test_hash_left_var = Poseidon2HalfVar::new_witness(&cs, &test_hash_left);
+        let test_hash_right_var = Poseidon2HalfVar::new_witness(&cs, &test_hash_right);
         let test_hash_column_var: [M31Var; 8] =
             std::array::from_fn(|i| M31Var::new_witness(&cs, &test_hash_column[i]));
 
@@ -281,11 +249,12 @@ mod test {
             )),
             &[],
         );
+        let a_val = a.value();
         for i in 0..8 {
-            assert_eq!(a.value[i], b.0[i]);
+            assert_eq!(a_val[i], b.0[i]);
         }
 
-        let test_hash_right_var = Poseidon2HalfStateRef::new_witness(&cs, &test_hash_right);
+        let test_hash_right_var = Poseidon2HalfVar::new_witness(&cs, &test_hash_right);
 
         let a = Poseidon31MerkleHasherVar::hash_tree_with_column(
             &test_hash_left_var,
@@ -299,8 +268,9 @@ mod test {
             )),
             &test_hash_column,
         );
+        let a_val = a.value();
         for i in 0..8 {
-            assert_eq!(a.value[i], b.0[i]);
+            assert_eq!(a_val[i], b.0[i]);
         }
 
         let config = PcsConfig {

@@ -113,7 +113,7 @@ impl FoldingResults {
                 .zip(folded_results.get(&log_size).unwrap().iter())
             {
                 let left = results_from_hints.get(&query).unwrap();
-                let right = &val.value;
+                let right = &val.value();
                 assert_eq!(left, right);
             }
         }

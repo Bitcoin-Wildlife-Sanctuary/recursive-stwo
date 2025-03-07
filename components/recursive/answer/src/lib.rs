@@ -122,11 +122,11 @@ impl AnswerResults {
                 );
                 for (shift_idx, (_, shifted_point)) in column.iter().enumerate() {
                     assert_eq!(
-                        shifted_point.x.value,
+                        shifted_point.x.value(),
                         fiat_shamir_hints.sample_points[round_idx][column_idx][shift_idx].x
                     );
                     assert_eq!(
-                        shifted_point.y.value,
+                        shifted_point.y.value(),
                         fiat_shamir_hints.sample_points[round_idx][column_idx][shift_idx].y
                     );
                 }
@@ -140,13 +140,13 @@ impl AnswerResults {
                 );
                 for (shift_idx, (_, shifted_point)) in column.iter().enumerate() {
                     assert_eq!(
-                        shifted_point.x.value,
+                        shifted_point.x.value(),
                         fiat_shamir_hints.sample_points[round_idx][round_plonk.len() + column_idx]
                             [shift_idx]
                             .x
                     );
                     assert_eq!(
-                        shifted_point.y.value,
+                        shifted_point.y.value(),
                         fiat_shamir_hints.sample_points[round_idx][round_plonk.len() + column_idx]
                             [shift_idx]
                             .y
@@ -336,7 +336,10 @@ impl AnswerResults {
                 .iter()
                 .zip(fri_answers.iter())
             {
-                assert_eq!(*map.get(&(k.bits.get_value().0 as usize)).unwrap(), v.value);
+                assert_eq!(
+                    *map.get(&(k.bits.get_value().0 as usize)).unwrap(),
+                    v.value()
+                );
             }
         }
 

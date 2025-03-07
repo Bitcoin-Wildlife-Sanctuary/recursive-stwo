@@ -4,7 +4,7 @@ use circle_plonk_dsl_constraint_system::{ConstraintSystemRef, ConstraintSystemTy
 use circle_plonk_dsl_fields::{
     CM31EmulatedVar, CM31Var, M31Var, QM31EmulatedVar, QM31NativeVar, QM31Var,
 };
-use num_traits::Zero;
+use num_traits::{One, Zero};
 use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::fields::qm31::QM31;
 use stwo_prover::examples::plonk_with_poseidon::poseidon::{PoseidonEntry, SwapOption};
@@ -34,6 +34,13 @@ pub struct Poseidon2HalfEmulatedVar {
 }
 
 impl Poseidon2HalfVar {
+    pub fn value(&self) -> [M31; 8] {
+        match self {
+            Poseidon2HalfVar::Native(var) => var.value.clone(),
+            Poseidon2HalfVar::Emulated(var) => std::array::from_fn(|i| var.elems[i].value),
+        }
+    }
+
     pub fn new_single_use_witness_only(cs: &ConstraintSystemRef, value: &[M31; 8]) -> Self {
         if cs.get_type() == ConstraintSystemType::QM31 {
             Poseidon2HalfVar::Native(Poseidon2HalfNativeVar {
@@ -459,8 +466,24 @@ impl Poseidon2HalfVar {
                     Poseidon2HalfVar::Native(new_right),
                 )
             }
-            (Poseidon2HalfVar::Emulated(left_var), Poseidon2HalfVar::Emulated(right_var)) => {
+            (Poseidon2HalfVar::Emulated(_left_var), Poseidon2HalfVar::Emulated(_right_var)) => {
                 todo!()
+            }
+            _ => unimplemented!(),
+        }
+    }
+
+    pub fn equalverify(&self, rhs: &Self) {
+        let cs = self.cs().and(&rhs.cs());
+        match (self, rhs) {
+            (Poseidon2HalfVar::Native(lhs), Poseidon2HalfVar::Native(rhs)) => {
+                cs.insert_gate(lhs.left_variable, 0, rhs.left_variable, M31::one());
+                cs.insert_gate(lhs.right_variable, 0, rhs.right_variable, M31::one());
+            }
+            (Poseidon2HalfVar::Emulated(lhs), Poseidon2HalfVar::Emulated(rhs)) => {
+                for i in 0..8 {
+                    lhs.elems[i].equalverify(&rhs.elems[i]);
+                }
             }
             _ => unimplemented!(),
         }

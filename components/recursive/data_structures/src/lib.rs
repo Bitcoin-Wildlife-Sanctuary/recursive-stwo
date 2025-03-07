@@ -5,7 +5,6 @@ use circle_plonk_dsl_constraint_system::ConstraintSystemRef;
 use circle_plonk_dsl_fields::{M31Var, QM31Var};
 use circle_plonk_dsl_hints::{DecommitHints, SinglePairMerkleProof, SinglePathMerkleProof};
 use circle_plonk_dsl_merkle::Poseidon31MerkleHasherVar;
-use num_traits::One;
 use std::collections::BTreeMap;
 use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::fri::FriProof;
@@ -311,7 +310,7 @@ impl SinglePathMerkleProofVar {
     pub fn verify(&mut self, root: &HashVar, query: &BitsVar) {
         // verify that the Merkle proof is valid
         self.value.verify();
-        assert_eq!(root.value, self.value.root.0);
+        assert_eq!(root.value(), self.value.root.0);
         assert_eq!(query.get_value().0, self.value.query as u32);
 
         let mut cur_hash = Poseidon31MerkleHasherVar::hash_m31_columns_get_rate(
@@ -342,13 +341,11 @@ impl SinglePathMerkleProofVar {
             }
         }
 
-        assert_eq!(cur_hash.value, root.value);
+        assert_eq!(cur_hash.value(), root.value());
 
         // check that the left_variable and right_variable are the same
         // as though in self.root
-        let cs = self.cs().and(&root.cs()).and(&query.cs());
-        cs.insert_gate(cur_hash.left_variable, 0, root.left_variable, M31::one());
-        cs.insert_gate(cur_hash.right_variable, 0, root.right_variable, M31::one());
+        cur_hash.equalverify(&root);
     }
 }
 
@@ -398,7 +395,7 @@ impl SinglePairMerkleProofVar {
     pub fn verify(&mut self, root: &HashVar, query: &BitsVar) {
         // verify that the Merkle proof is valid
         self.value.verify();
-        assert_eq!(root.value, self.value.root.0);
+        assert_eq!(root.value(), self.value.root.0);
         assert_eq!(query.get_value().0, self.value.query as u32);
 
         let cs = self.cs().and(&root.cs()).and(&query.cs());
@@ -454,13 +451,11 @@ impl SinglePairMerkleProofVar {
             }
         }
 
-        assert_eq!(self_hash.value, root.value);
+        assert_eq!(self_hash.value(), root.value());
 
         // check that the left_variable and right_variable are the same
         // as though in self.root
-        let cs = self.cs().and(&root.cs()).and(&query.cs());
-        cs.insert_gate(self_hash.left_variable, 0, root.left_variable, M31::one());
-        cs.insert_gate(self_hash.right_variable, 0, root.right_variable, M31::one());
+        self_hash.equalverify(&root);
     }
 }
 
