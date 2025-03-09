@@ -18,6 +18,7 @@ use std::ops::Add;
 use stwo_prover::constraint_framework::PREPROCESSED_TRACE_IDX;
 use stwo_prover::core::pcs::{PcsConfig, TreeVec};
 use stwo_prover::core::poly::circle::CanonicCoset;
+use stwo_prover::core::vcs::poseidon31_merkle::Poseidon31MerkleChannel;
 use stwo_prover::core::ColumnVec;
 
 pub mod data_structures;
@@ -32,9 +33,9 @@ pub struct AnswerResults {
 impl AnswerResults {
     pub fn compute(
         oods_point: &CirclePointQM31Var,
-        fiat_shamir_hints: &FiatShamirHints,
+        fiat_shamir_hints: &FiatShamirHints<Poseidon31MerkleChannel>,
         fiat_shamir_results: &FiatShamirResults,
-        fri_answer_hints: &AnswerHints,
+        fri_answer_hints: &AnswerHints<Poseidon31MerkleChannel>,
         decommit_hints: &DecommitHints,
         proof: &PlonkWithPoseidonProofVar,
         pcs_config: PcsConfig,
@@ -412,7 +413,7 @@ mod test {
 
         let fiat_shamir_hints = FiatShamirHints::new(&proof, config, &[(1, QM31::one())]);
 
-        let cs = ConstraintSystemRef::new_qm31_ref();
+        let cs = ConstraintSystemRef::new_plonk_with_poseidon_ref();
         let mut proof_var = PlonkWithPoseidonProofVar::new_witness(&cs, &proof);
 
         let fiat_shamir_results = FiatShamirResults::compute(
@@ -439,7 +440,7 @@ mod test {
         cs.populate_logup_arguments();
         cs.check_poseidon_invocations();
 
-        let (plonk, mut poseidon) = cs.generate_qm31_circuit();
+        let (plonk, mut poseidon) = cs.generate_plonk_with_poseidon_circuit();
         let proof =
             prove_plonk_with_poseidon::<Poseidon31MerkleChannel>(config, &plonk, &mut poseidon);
         verify_plonk_with_poseidon::<Poseidon31MerkleChannel>(

@@ -4,13 +4,14 @@ use circle_plonk_dsl_fiat_shamir::FiatShamirResults;
 use circle_plonk_dsl_fields::QM31Var;
 use circle_plonk_dsl_hints::{FiatShamirHints, FirstLayerHints, InnerLayersHints};
 use std::collections::{BTreeMap, HashMap};
+use stwo_prover::core::vcs::poseidon31_merkle::Poseidon31MerkleChannel;
 
 pub struct FoldingResults;
 
 impl FoldingResults {
     pub fn compute(
         proof_var: &PlonkWithPoseidonProofVar,
-        fiat_shamir_hints: &FiatShamirHints,
+        fiat_shamir_hints: &FiatShamirHints<Poseidon31MerkleChannel>,
         fiat_shamir_results: &FiatShamirResults,
         answer_results: &AnswerResults,
         first_layer_hints: &FirstLayerHints,
@@ -247,7 +248,7 @@ mod test {
             &proof,
         );
 
-        let cs = ConstraintSystemRef::new_qm31_ref();
+        let cs = ConstraintSystemRef::new_plonk_with_poseidon_ref();
         let mut proof_var = PlonkWithPoseidonProofVar::new_witness(&cs, &proof);
 
         let fiat_shamir_results = FiatShamirResults::compute(
@@ -281,7 +282,7 @@ mod test {
         cs.populate_logup_arguments();
         cs.check_poseidon_invocations();
 
-        let (plonk, mut poseidon) = cs.generate_qm31_circuit();
+        let (plonk, mut poseidon) = cs.generate_plonk_with_poseidon_circuit();
         let proof =
             prove_plonk_with_poseidon::<Poseidon31MerkleChannel>(config, &plonk, &mut poseidon);
         verify_plonk_with_poseidon::<Poseidon31MerkleChannel>(

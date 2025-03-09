@@ -2,10 +2,11 @@ use crate::FiatShamirHints;
 use itertools::Itertools;
 use std::collections::BTreeMap;
 use std::iter::zip;
+use std::marker::PhantomData;
+use stwo_prover::core::channel::MerkleChannel;
 use stwo_prover::core::fields::m31::BaseField;
 use stwo_prover::core::fields::qm31::SecureField;
 use stwo_prover::core::pcs::quotients::{fri_answers, PointSample};
-use stwo_prover::core::vcs::poseidon31_merkle::Poseidon31MerkleHasher;
 use stwo_prover::core::ColumnVec;
 use stwo_prover::examples::plonk_with_poseidon::air::PlonkWithPoseidonProof;
 
@@ -14,15 +15,16 @@ pub struct SampledValuesPerLogSize(pub BTreeMap<u32, ColumnVec<BaseField>>);
 #[derive(Debug, Default)]
 pub struct SampledValues(pub BTreeMap<u32, SampledValuesPerLogSize>);
 
-pub struct AnswerHints {
+pub struct AnswerHints<MC: MerkleChannel> {
     pub fri_answers: ColumnVec<Vec<SecureField>>,
     pub sampled_values: SampledValues,
+    pub phantom: PhantomData<MC>,
 }
 
-impl AnswerHints {
+impl<MC: MerkleChannel> AnswerHints<MC> {
     pub fn compute(
-        fiat_shamir_hints: &FiatShamirHints,
-        proof: &PlonkWithPoseidonProof<Poseidon31MerkleHasher>,
+        fiat_shamir_hints: &FiatShamirHints<MC>,
+        proof: &PlonkWithPoseidonProof<MC::H>,
     ) -> Self {
         // Answer FRI queries.
         let samples = fiat_shamir_hints
@@ -85,6 +87,7 @@ impl AnswerHints {
         Self {
             sampled_values,
             fri_answers,
+            phantom: PhantomData,
         }
     }
 }
@@ -96,7 +99,9 @@ mod test {
     use stwo_prover::core::fields::qm31::QM31;
     use stwo_prover::core::fri::FriConfig;
     use stwo_prover::core::pcs::PcsConfig;
-    use stwo_prover::core::vcs::poseidon31_merkle::Poseidon31MerkleHasher;
+    use stwo_prover::core::vcs::poseidon31_merkle::{
+        Poseidon31MerkleChannel, Poseidon31MerkleHasher,
+    };
     use stwo_prover::examples::plonk_with_poseidon::air::PlonkWithPoseidonProof;
 
     #[test]
@@ -108,7 +113,9 @@ mod test {
             fri_config: FriConfig::new(0, 5, 16),
         };
 
-        let fiat_shamir_hints = FiatShamirHints::new(&proof, config, &[(1, QM31::one())]);
-        let _fri_answer_hints = AnswerHints::compute(&fiat_shamir_hints, &proof);
+        let fiat_shamir_hints =
+            FiatShamirHints::<Poseidon31MerkleChannel>::new(&proof, config, &[(1, QM31::one())]);
+        let _fri_answer_hints =
+            AnswerHints::<Poseidon31MerkleChannel>::compute(&fiat_shamir_hints, &proof);
     }
 }

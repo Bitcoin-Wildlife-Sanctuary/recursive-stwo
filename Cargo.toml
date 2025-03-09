@@ -4,7 +4,7 @@ members = [
     "dsl/constraint_system", "primitives/poseidon31", "primitives/fields", "primitives/channel", "primitives/query",
     "components/hints", "components/recursive/fiat_shamir", "components/recursive/composition", "components/recursive/data_structures",
     "components/recursive/answer", "components/recursive/folding",
-    "components/last/fiat_shamir",
+    "components/last/fiat_shamir", "components/last/data_structures",
     "primitives/bits", "primitives/circle", "primitives/merkle",
     "examples/single-proof", "examples/multi-proofs",
 ]
@@ -17,6 +17,7 @@ rand = "0.8.5"
 bincode = "1.3.3"
 itertools = "0.13.0"
 indexmap = "2.7.0"
+educe = "0.6.0"
 
 [profile.release]
 opt-level = 3

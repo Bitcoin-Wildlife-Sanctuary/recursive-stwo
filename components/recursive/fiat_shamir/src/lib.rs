@@ -10,6 +10,7 @@ use circle_plonk_dsl_hints::FiatShamirHints;
 use stwo_prover::core::fields::qm31::QM31;
 use stwo_prover::core::fields::FieldExpOps;
 use stwo_prover::core::pcs::PcsConfig;
+use stwo_prover::core::vcs::poseidon31_merkle::Poseidon31MerkleChannel;
 
 pub struct FiatShamirResults {
     pub preprocessed_commitment: HashVar,
@@ -30,7 +31,7 @@ pub struct FiatShamirResults {
 
 impl FiatShamirResults {
     pub fn compute(
-        fiat_shamir_hints: &FiatShamirHints,
+        fiat_shamir_hints: &FiatShamirHints<Poseidon31MerkleChannel>,
         proof: &mut PlonkWithPoseidonProofVar,
         pcs_config: PcsConfig,
         inputs: &[(usize, QM31Var)],
@@ -200,7 +201,7 @@ mod test {
 
         let fiat_shamir_hints = FiatShamirHints::new(&proof, config, &[(1, QM31::one())]);
 
-        let cs = ConstraintSystemRef::new_qm31_ref();
+        let cs = ConstraintSystemRef::new_plonk_with_poseidon_ref();
         let mut proof_var = PlonkWithPoseidonProofVar::new_witness(&cs, &proof);
 
         let _results = FiatShamirResults::compute(
@@ -215,7 +216,7 @@ mod test {
         cs.populate_logup_arguments();
         cs.check_poseidon_invocations();
 
-        let (plonk, mut poseidon) = cs.generate_qm31_circuit();
+        let (plonk, mut poseidon) = cs.generate_plonk_with_poseidon_circuit();
         let proof =
             prove_plonk_with_poseidon::<Poseidon31MerkleChannel>(config, &plonk, &mut poseidon);
         verify_plonk_with_poseidon::<Poseidon31MerkleChannel>(

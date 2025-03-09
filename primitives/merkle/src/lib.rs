@@ -43,7 +43,7 @@ impl Poseidon31MerkleHasherVar {
         bit_value: bool,
         bit_variable: usize,
     ) -> Poseidon2HalfVar {
-        Poseidon2HalfVar::swap_permute_get_rate(&left, &right, bit_variable, bit_value)
+        Poseidon2HalfVar::swap_permute_get_rate(&left, &right, Some((bit_value, bit_variable)))
     }
 
     pub fn hash_tree_with_column_hash_with_swap(
@@ -54,7 +54,7 @@ impl Poseidon31MerkleHasherVar {
         column_hash: &Poseidon2HalfVar,
     ) -> Poseidon2HalfVar {
         let hash_tree =
-            Poseidon2HalfVar::swap_permute_get_rate(&left, &right, bit_variable, bit_value);
+            Poseidon2HalfVar::swap_permute_get_rate(&left, &right, Some((bit_value, bit_variable)));
         Poseidon2HalfVar::permute_get_rate(&hash_tree, column_hash)
     }
 
@@ -178,7 +178,7 @@ mod test {
         let mut prng = SmallRng::seed_from_u64(0);
         let test: [M31; 25] = prng.gen();
 
-        let cs = ConstraintSystemRef::new_qm31_ref();
+        let cs = ConstraintSystemRef::new_plonk_with_poseidon_ref();
         let mut test_var = vec![];
         for v in test.iter() {
             test_var.push(M31Var::new_constant(&cs, v));
@@ -283,7 +283,7 @@ mod test {
         cs.populate_logup_arguments();
         cs.check_poseidon_invocations();
 
-        let (plonk, mut poseidon) = cs.generate_qm31_circuit();
+        let (plonk, mut poseidon) = cs.generate_plonk_with_poseidon_circuit();
         let proof =
             prove_plonk_with_poseidon::<Poseidon31MerkleChannel>(config, &plonk, &mut poseidon);
         verify_plonk_with_poseidon::<Poseidon31MerkleChannel>(

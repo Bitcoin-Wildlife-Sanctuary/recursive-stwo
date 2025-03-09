@@ -524,7 +524,9 @@ mod test {
     use stwo_prover::core::fields::qm31::QM31;
     use stwo_prover::core::fri::FriConfig;
     use stwo_prover::core::pcs::PcsConfig;
-    use stwo_prover::core::vcs::poseidon31_merkle::Poseidon31MerkleHasher;
+    use stwo_prover::core::vcs::poseidon31_merkle::{
+        Poseidon31MerkleChannel, Poseidon31MerkleHasher,
+    };
     use stwo_prover::examples::plonk_with_poseidon::air::PlonkWithPoseidonProof;
 
     #[test]
@@ -536,7 +538,8 @@ mod test {
             fri_config: FriConfig::new(0, 5, 16),
         };
 
-        let fiat_shamir_hints = FiatShamirHints::new(&proof, config, &[(1, QM31::one())]);
+        let fiat_shamir_hints =
+            FiatShamirHints::<Poseidon31MerkleChannel>::new(&proof, config, &[(1, QM31::one())]);
 
         let max_log_size = *fiat_shamir_hints.n_columns_per_log_size[0]
             .keys()
@@ -557,7 +560,7 @@ mod test {
             proof.verify();
         }
 
-        let cs = ConstraintSystemRef::new_qm31_ref();
+        let cs = ConstraintSystemRef::new_plonk_with_poseidon_ref();
         let root = HashVar::new_witness(&cs, &proof.stark_proof.commitments[0].0);
         for proof in proofs.iter() {
             let mut proof_var = SinglePathMerkleProofVar::new(&cs, proof);
@@ -583,7 +586,7 @@ mod test {
             proof.verify();
         }
 
-        let cs = ConstraintSystemRef::new_qm31_ref();
+        let cs = ConstraintSystemRef::new_plonk_with_poseidon_ref();
         let root = HashVar::new_witness(&cs, &proof.stark_proof.fri_proof.first_layer.commitment.0);
         for proof in first_layer_hints.merkle_proofs.iter() {
             let mut proof_var = SinglePairMerkleProofVar::new(&cs, proof);

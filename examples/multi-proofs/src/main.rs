@@ -64,7 +64,7 @@ pub fn demo_recurse<C: MerkleChannel>(
         &proof,
     );
 
-    let cs = ConstraintSystemRef::new_qm31_ref();
+    let cs = ConstraintSystemRef::new_plonk_with_poseidon_ref();
 
     for _ in 0..multipliers {
         let mut proof_var = PlonkWithPoseidonProofVar::new_witness(&cs, &proof);
@@ -123,7 +123,7 @@ pub fn demo_recurse<C: MerkleChannel>(
     cs.populate_logup_arguments();
     cs.check_poseidon_invocations();
 
-    let (plonk, mut poseidon) = cs.generate_qm31_circuit();
+    let (plonk, mut poseidon) = cs.generate_plonk_with_poseidon_circuit();
 
     if std::fs::exists(dest).unwrap() {
         return;

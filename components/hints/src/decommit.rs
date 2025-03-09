@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use stwo_prover::core::fields::m31::{BaseField, M31};
 use stwo_prover::core::vcs::ops::MerkleHasher;
 use stwo_prover::core::vcs::poseidon31_hash::Poseidon31Hash;
-use stwo_prover::core::vcs::poseidon31_merkle::Poseidon31MerkleHasher;
+use stwo_prover::core::vcs::poseidon31_merkle::{Poseidon31MerkleChannel, Poseidon31MerkleHasher};
 use stwo_prover::core::vcs::prover::MerkleDecommitment;
 use stwo_prover::examples::plonk_with_poseidon::air::PlonkWithPoseidonProof;
 
@@ -193,7 +193,7 @@ pub struct DecommitHints {
 
 impl DecommitHints {
     pub fn compute(
-        fiat_shamir_hints: &FiatShamirHints,
+        fiat_shamir_hints: &FiatShamirHints<Poseidon31MerkleChannel>,
         proof: &PlonkWithPoseidonProof<Poseidon31MerkleHasher>,
     ) -> Self {
         let mut precomputed_proofs = vec![];
@@ -270,7 +270,8 @@ mod test {
         )
         .unwrap();
 
-        let fiat_shamir_hints = FiatShamirHints::new(&proof, config, &[(1, QM31::one())]);
+        let fiat_shamir_hints =
+            FiatShamirHints::<Poseidon31MerkleChannel>::new(&proof, config, &[(1, QM31::one())]);
         let _ = DecommitHints::compute(&fiat_shamir_hints, &proof);
     }
 }

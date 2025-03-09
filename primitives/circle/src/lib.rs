@@ -258,7 +258,7 @@ mod test {
         let a = circle_domain.at(bit_reverse_index(40, 16));
         let b = circle_domain.at(bit_reverse_index(41, 16));
 
-        let cs = ConstraintSystemRef::new_qm31_ref();
+        let cs = ConstraintSystemRef::new_plonk_with_poseidon_ref();
 
         let a_index = M31Var::new_witness(&cs, &M31::from(40));
         let b_index = M31Var::new_witness(&cs, &M31::from(41));

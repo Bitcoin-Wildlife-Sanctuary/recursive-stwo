@@ -11,6 +11,7 @@ use circle_plonk_dsl_hints::FiatShamirHints;
 use itertools::Itertools;
 use stwo_prover::constraint_framework::PREPROCESSED_TRACE_IDX;
 use stwo_prover::core::poly::circle::CanonicCoset;
+use stwo_prover::core::vcs::poseidon31_merkle::Poseidon31MerkleChannel;
 
 pub mod data_structures;
 pub mod plonk;
@@ -33,7 +34,7 @@ pub struct CompositionCheck;
 
 impl CompositionCheck {
     pub fn compute(
-        fiat_shamir_hints: &FiatShamirHints,
+        fiat_shamir_hints: &FiatShamirHints<Poseidon31MerkleChannel>,
         lookup_elements: &PlonkWithAcceleratorLookupElementsVar,
         random_coeff: QM31Var,
         oods_point: CirclePointQM31Var,
@@ -148,7 +149,7 @@ mod test {
 
         let fiat_shamir_hints = FiatShamirHints::new(&proof, config, &[(1, QM31::one())]);
 
-        let cs = ConstraintSystemRef::new_qm31_ref();
+        let cs = ConstraintSystemRef::new_plonk_with_poseidon_ref();
         let proof_var = PlonkWithPoseidonProofVar::new_witness(&cs, &proof);
 
         CompositionCheck::compute(
@@ -171,7 +172,7 @@ mod test {
         cs.populate_logup_arguments();
         cs.check_poseidon_invocations();
 
-        let (plonk, mut poseidon) = cs.generate_qm31_circuit();
+        let (plonk, mut poseidon) = cs.generate_plonk_with_poseidon_circuit();
         let proof =
             prove_plonk_with_poseidon::<Poseidon31MerkleChannel>(config, &plonk, &mut poseidon);
         verify_plonk_with_poseidon::<Poseidon31MerkleChannel>(
