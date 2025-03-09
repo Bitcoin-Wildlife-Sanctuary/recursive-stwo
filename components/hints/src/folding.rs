@@ -11,7 +11,7 @@ use stwo_prover::core::fri::SparseEvaluation;
 use stwo_prover::core::utils::bit_reverse_index;
 use stwo_prover::core::vcs::ops::MerkleHasher;
 use stwo_prover::core::vcs::poseidon31_hash::Poseidon31Hash;
-use stwo_prover::core::vcs::poseidon31_merkle::Poseidon31MerkleHasher;
+use stwo_prover::core::vcs::poseidon31_merkle::{Poseidon31MerkleChannel, Poseidon31MerkleHasher};
 use stwo_prover::core::vcs::poseidon31_ref::Poseidon31CRH;
 use stwo_prover::core::vcs::prover::MerkleDecommitment;
 use stwo_prover::core::vcs::verifier::MerkleVerifier;
@@ -295,8 +295,8 @@ pub struct FirstLayerHints {
 
 impl FirstLayerHints {
     pub fn compute(
-        fiat_shamir_hints: &FiatShamirHints,
-        answer_hints: &AnswerHints,
+        fiat_shamir_hints: &FiatShamirHints<Poseidon31MerkleChannel>,
+        answer_hints: &AnswerHints<Poseidon31MerkleChannel>,
         proof: &PlonkWithPoseidonProof<Poseidon31MerkleHasher>,
     ) -> FirstLayerHints {
         // Columns are provided in descending order by size.
@@ -459,7 +459,7 @@ pub struct InnerLayersHints {
 impl InnerLayersHints {
     pub fn compute(
         folded_evals_by_column: &BTreeMap<u32, Vec<SecureField>>,
-        fiat_shamir_hints: &FiatShamirHints,
+        fiat_shamir_hints: &FiatShamirHints<Poseidon31MerkleChannel>,
         proof: &PlonkWithPoseidonProof<Poseidon31MerkleHasher>,
     ) -> InnerLayersHints {
         let mut log_size = fiat_shamir_hints.max_first_layer_column_log_size;
@@ -584,7 +584,9 @@ mod test {
     use stwo_prover::core::fields::qm31::QM31;
     use stwo_prover::core::fri::FriConfig;
     use stwo_prover::core::pcs::PcsConfig;
-    use stwo_prover::core::vcs::poseidon31_merkle::Poseidon31MerkleHasher;
+    use stwo_prover::core::vcs::poseidon31_merkle::{
+        Poseidon31MerkleChannel, Poseidon31MerkleHasher,
+    };
     use stwo_prover::examples::plonk_with_poseidon::air::PlonkWithPoseidonProof;
 
     #[test]
@@ -596,7 +598,8 @@ mod test {
             fri_config: FriConfig::new(0, 5, 16),
         };
 
-        let fiat_shamir_hints = FiatShamirHints::new(&proof, config, &[(1, QM31::one())]);
+        let fiat_shamir_hints =
+            FiatShamirHints::<Poseidon31MerkleChannel>::new(&proof, config, &[(1, QM31::one())]);
         let answer_hints = AnswerHints::compute(&fiat_shamir_hints, &proof);
         let first_layer_hints = FirstLayerHints::compute(&fiat_shamir_hints, &answer_hints, &proof);
         for proof in first_layer_hints.merkle_proofs.iter() {

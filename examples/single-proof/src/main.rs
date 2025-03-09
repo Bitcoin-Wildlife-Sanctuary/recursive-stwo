@@ -40,7 +40,7 @@ fn main() {
         &proof,
     );
 
-    let cs = ConstraintSystemRef::new_ref();
+    let cs = ConstraintSystemRef::new_plonk_with_poseidon_ref();
     let mut proof_var = PlonkWithPoseidonProofVar::new_witness(&cs, &proof);
 
     println!("after allocating the proof: {}", cs.num_plonk_rows());
@@ -87,7 +87,7 @@ fn main() {
     cs.populate_logup_arguments();
     cs.check_poseidon_invocations();
 
-    let (plonk, mut poseidon) = cs.generate_circuit();
+    let (plonk, mut poseidon) = cs.generate_plonk_with_poseidon_circuit();
     let proof = prove_plonk_with_poseidon::<Poseidon31MerkleChannel>(config, &plonk, &mut poseidon);
 
     let path = format!(

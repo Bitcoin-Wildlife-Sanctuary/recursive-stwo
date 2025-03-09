@@ -11,23 +11,31 @@ use circle_plonk_dsl_hints::{
     AnswerHints, DecommitHints, FiatShamirHints, FirstLayerHints, InnerLayersHints,
 };
 use num_traits::One;
+use serde::Serialize;
 use std::io::Write;
 use std::path::Path;
+use stwo_prover::core::backend::simd::SimdBackend;
+use stwo_prover::core::backend::BackendForChannel;
+use stwo_prover::core::channel::MerkleChannel;
 use stwo_prover::core::fields::qm31::QM31;
 use stwo_prover::core::fri::FriConfig;
 use stwo_prover::core::pcs::PcsConfig;
 use stwo_prover::core::vcs::poseidon31_merkle::{Poseidon31MerkleChannel, Poseidon31MerkleHasher};
+use stwo_prover::core::vcs::sha256_poseidon31_merkle::Sha256Poseidon31MerkleChannel;
 use stwo_prover::examples::plonk_with_poseidon::air::{
     prove_plonk_with_poseidon, verify_plonk_with_poseidon, PlonkWithPoseidonProof,
 };
 
-pub fn demo_recurse(
+pub fn demo_recurse<C: MerkleChannel>(
     src: &Path,
     src_config: PcsConfig,
     multipliers: usize,
     dest: &Path,
     dest_config: PcsConfig,
-) {
+) where
+    SimdBackend: BackendForChannel<C>,
+    C::H: Serialize,
+{
     println!(
         "Generating a proof at {} that verifies {}",
         dest.display(),
@@ -56,7 +64,7 @@ pub fn demo_recurse(
         &proof,
     );
 
-    let cs = ConstraintSystemRef::new_ref();
+    let cs = ConstraintSystemRef::new_plonk_with_poseidon_ref();
 
     for _ in 0..multipliers {
         let mut proof_var = PlonkWithPoseidonProofVar::new_witness(&cs, &proof);
@@ -115,22 +123,21 @@ pub fn demo_recurse(
     cs.populate_logup_arguments();
     cs.check_poseidon_invocations();
 
-    let (plonk, mut poseidon) = cs.generate_circuit();
+    let (plonk, mut poseidon) = cs.generate_plonk_with_poseidon_circuit();
 
     if std::fs::exists(dest).unwrap() {
         return;
     }
 
     let timer = std::time::Instant::now();
-    let proof =
-        prove_plonk_with_poseidon::<Poseidon31MerkleChannel>(dest_config, &plonk, &mut poseidon);
+    let proof = prove_plonk_with_poseidon::<C>(dest_config, &plonk, &mut poseidon);
     println!("proof generation time: {}s", timer.elapsed().as_secs_f64());
 
     let encoded = bincode::serialize(&proof).unwrap();
     let mut fs = std::fs::File::create(dest).unwrap();
     fs.write(&encoded).unwrap();
 
-    verify_plonk_with_poseidon::<Poseidon31MerkleChannel>(
+    verify_plonk_with_poseidon::<C>(
         proof,
         dest_config,
         &[
@@ -168,102 +175,102 @@ fn main() {
         fri_config: FriConfig::new(0, 9, 8),
     };
 
-    demo_recurse(
+    demo_recurse::<Poseidon31MerkleChannel>(
         Path::new("../../components/test_data/recursive_proof_16_15.bin"),
         standard_config,
         5,
         Path::new("data/level1-5.bin"),
         fast_prover_config,
     );
-    demo_recurse(
+    demo_recurse::<Poseidon31MerkleChannel>(
         Path::new("data/level1-5.bin"),
         fast_prover_config,
         1,
         Path::new("data/level2-1.bin"),
         fast_prover2_config,
     );
-    demo_recurse(
+    demo_recurse::<Poseidon31MerkleChannel>(
         Path::new("data/level2-1.bin"),
         fast_prover2_config,
         1,
         Path::new("data/level3-1.bin"),
         standard_config,
     );
-    demo_recurse(
+    demo_recurse::<Poseidon31MerkleChannel>(
         Path::new("data/level3-1.bin"),
         standard_config,
         5,
         Path::new("data/level4-5.bin"),
         fast_prover_config,
     );
-    demo_recurse(
+    demo_recurse::<Poseidon31MerkleChannel>(
         Path::new("data/level4-5.bin"),
         fast_prover_config,
         1,
         Path::new("data/level5-1.bin"),
         fast_prover2_config,
     );
-    demo_recurse(
+    demo_recurse::<Poseidon31MerkleChannel>(
         Path::new("data/level5-1.bin"),
         fast_prover2_config,
         1,
         Path::new("data/level6-1.bin"),
         standard_config,
     );
-    demo_recurse(
+    demo_recurse::<Poseidon31MerkleChannel>(
         Path::new("data/level6-1.bin"),
         standard_config,
         1,
         Path::new("data/level7-1.bin"),
         standard_config,
     );
-    demo_recurse(
+    demo_recurse::<Poseidon31MerkleChannel>(
         Path::new("data/level7-1.bin"),
         standard_config,
         1,
         Path::new("data/level8-1.bin"),
         fast_verifier_config,
     );
-    demo_recurse(
+    demo_recurse::<Poseidon31MerkleChannel>(
         Path::new("data/level8-1.bin"),
         fast_verifier_config,
         1,
         Path::new("data/level9-1.bin"),
         fast_verifier_config,
     );
-    demo_recurse(
+    demo_recurse::<Poseidon31MerkleChannel>(
         Path::new("data/level9-1.bin"),
         fast_verifier_config,
         1,
         Path::new("data/level10-1.bin"),
         fast_verifier2_config,
     );
-    demo_recurse(
+    demo_recurse::<Poseidon31MerkleChannel>(
         Path::new("data/level10-1.bin"),
         fast_verifier2_config,
         1,
         Path::new("data/level11-1.bin"),
         fast_verifier2_config,
     );
-    demo_recurse(
+    demo_recurse::<Poseidon31MerkleChannel>(
         Path::new("data/level11-1.bin"),
         fast_verifier2_config,
         1,
         Path::new("data/level12-1.bin"),
         fast_verifier3_config,
     );
-    demo_recurse(
+    demo_recurse::<Poseidon31MerkleChannel>(
         Path::new("data/level12-1.bin"),
         fast_verifier3_config,
         1,
         Path::new("data/level13-1.bin"),
         fast_verifier3_config,
     );
-    demo_recurse(
+    demo_recurse::<Sha256Poseidon31MerkleChannel>(
         Path::new("data/level13-1.bin"),
         fast_verifier3_config,
         1,
         Path::new("data/level14-1.bin"),
-        fast_prover_config,
+        fast_verifier3_config,
     );
 }

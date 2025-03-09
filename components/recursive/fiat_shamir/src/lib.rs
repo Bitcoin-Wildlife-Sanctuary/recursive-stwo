@@ -10,6 +10,7 @@ use circle_plonk_dsl_hints::FiatShamirHints;
 use stwo_prover::core::fields::qm31::QM31;
 use stwo_prover::core::fields::FieldExpOps;
 use stwo_prover::core::pcs::PcsConfig;
+use stwo_prover::core::vcs::poseidon31_merkle::Poseidon31MerkleChannel;
 
 pub struct FiatShamirResults {
     pub preprocessed_commitment: HashVar,
@@ -30,7 +31,7 @@ pub struct FiatShamirResults {
 
 impl FiatShamirResults {
     pub fn compute(
-        fiat_shamir_hints: &FiatShamirHints,
+        fiat_shamir_hints: &FiatShamirHints<Poseidon31MerkleChannel>,
         proof: &mut PlonkWithPoseidonProofVar,
         pcs_config: PcsConfig,
         inputs: &[(usize, QM31Var)],
@@ -134,23 +135,23 @@ impl FiatShamirResults {
         (&(&input_sum + &proof.stmt1.poseidon_total_sum) + &proof.stmt1.plonk_total_sum)
             .equalverify(&QM31Var::zero(&cs));
 
-        assert_eq!(lookup_elements.z.value, fiat_shamir_hints.z);
-        assert_eq!(lookup_elements.alpha.value, fiat_shamir_hints.alpha);
+        assert_eq!(lookup_elements.z.value(), fiat_shamir_hints.z);
+        assert_eq!(lookup_elements.alpha.value(), fiat_shamir_hints.alpha);
         for i in 0..3 {
             assert_eq!(
-                lookup_elements.alpha_powers[i].value,
+                lookup_elements.alpha_powers[i].value(),
                 fiat_shamir_hints.alpha.pow(i as u128)
             );
         }
-        assert_eq!(random_coeff.value, fiat_shamir_hints.random_coeff);
-        assert_eq!(oods_point.x.value, fiat_shamir_hints.oods_point.x);
-        assert_eq!(oods_point.y.value, fiat_shamir_hints.oods_point.y);
+        assert_eq!(random_coeff.value(), fiat_shamir_hints.random_coeff);
+        assert_eq!(oods_point.x.value(), fiat_shamir_hints.oods_point.x);
+        assert_eq!(oods_point.y.value(), fiat_shamir_hints.oods_point.y);
         assert_eq!(
-            after_sampled_values_random_coeff.value,
+            after_sampled_values_random_coeff.value(),
             fiat_shamir_hints.after_sampled_values_random_coeff
         );
         for (l, r) in fri_alphas.iter().zip(fiat_shamir_hints.fri_alphas.iter()) {
-            assert_eq!(l.value, *r);
+            assert_eq!(l.value(), *r);
         }
 
         Self {
@@ -192,7 +193,7 @@ mod test {
     #[test]
     fn test_fiat_shamir() {
         let proof: PlonkWithPoseidonProof<Poseidon31MerkleHasher> =
-            bincode::deserialize(include_bytes!("../../test_data/small_proof.bin")).unwrap();
+            bincode::deserialize(include_bytes!("../../../test_data/small_proof.bin")).unwrap();
         let config = PcsConfig {
             pow_bits: 20,
             fri_config: FriConfig::new(0, 5, 16),
@@ -200,7 +201,7 @@ mod test {
 
         let fiat_shamir_hints = FiatShamirHints::new(&proof, config, &[(1, QM31::one())]);
 
-        let cs = ConstraintSystemRef::new_ref();
+        let cs = ConstraintSystemRef::new_plonk_with_poseidon_ref();
         let mut proof_var = PlonkWithPoseidonProofVar::new_witness(&cs, &proof);
 
         let _results = FiatShamirResults::compute(
@@ -215,7 +216,7 @@ mod test {
         cs.populate_logup_arguments();
         cs.check_poseidon_invocations();
 
-        let (plonk, mut poseidon) = cs.generate_circuit();
+        let (plonk, mut poseidon) = cs.generate_plonk_with_poseidon_circuit();
         let proof =
             prove_plonk_with_poseidon::<Poseidon31MerkleChannel>(config, &plonk, &mut poseidon);
         verify_plonk_with_poseidon::<Poseidon31MerkleChannel>(

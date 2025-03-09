@@ -26,7 +26,7 @@ impl DVar for QM31Var {
 impl AllocVar for QM31Var {
     fn new_variables(cs: &ConstraintSystemRef, value: &Self::Value, mode: AllocationMode) -> Self {
         if mode != AllocationMode::Constant {
-            Self {
+            QM31Var {
                 cs: cs.clone(),
                 value: *value,
                 variable: cs.new_qm31(*value, mode),
@@ -240,7 +240,6 @@ impl Neg for &QM31Var {
     fn neg(self) -> Self::Output {
         let value = -self.value;
         let variable = self.cs.mul_constant(self.variable, M31::one().neg());
-
         QM31Var {
             cs: self.cs.clone(),
             value,
@@ -250,10 +249,13 @@ impl Neg for &QM31Var {
 }
 
 impl QM31Var {
+    pub fn value(&self) -> QM31 {
+        self.value
+    }
+
     pub fn from_m31(a0: &M31Var, a1: &M31Var, a2: &M31Var, a3: &M31Var) -> Self {
         let cs = a0.cs().and(&a1.cs()).and(&a2.cs()).and(&a3.cs());
-
-        Self {
+        QM31Var {
             cs: cs.clone(),
             value: QM31(CM31(a0.value, a1.value), CM31(a2.value, a3.value)),
             variable: cs.add(
@@ -275,7 +277,6 @@ impl QM31Var {
         let r = cs.mul(cs.add(a2.variable, cs.mul(a3.variable, 2)), 3);
 
         cs.insert_gate(l, r, self.variable, M31::one());
-
         [a0, a1, a2, a3]
     }
 
@@ -309,13 +310,12 @@ impl QM31Var {
         cur
     }
 
-    pub fn from_cm31(a0: &CM31Var, a1: &CM31Var) -> Self {
-        let cs = a0.cs().and(&a1.cs());
-
-        Self {
+    pub fn from_cm31(a: &CM31Var, b: &CM31Var) -> Self {
+        let cs = a.cs.and(&b.cs);
+        QM31Var {
             cs: cs.clone(),
-            value: QM31(a0.value, a1.value),
-            variable: cs.add(a0.variable, cs.mul(a1.variable, 3)),
+            value: QM31(a.value, b.value),
+            variable: cs.add(a.variable, cs.mul(b.variable, 3)),
         }
     }
 
@@ -381,7 +381,6 @@ impl QM31Var {
         let b = self.mul_constant_m31(constant.1);
 
         let variable = cs.add(a.variable, cs.mul(b.variable, 2));
-
         QM31Var {
             cs,
             value: self.value * QM31(constant, CM31::zero()),
@@ -428,7 +427,7 @@ impl QM31Var {
         let mut variable = cs.mul(b_minus_a.variable, bit_variable);
         variable = cs.add(a.variable, variable);
 
-        Self {
+        QM31Var {
             cs,
             value,
             variable,
@@ -446,10 +445,8 @@ impl QM31Var {
 
         let b_minus_a = b - a;
         let mut left_variable = cs.mul(b_minus_a.variable, bit_variable);
+        let mut right_variable = cs.mul_constant(left_variable, M31::one().neg());
         left_variable = cs.add(a.variable, left_variable);
-
-        let a_minus_b = a - b;
-        let mut right_variable = cs.mul(a_minus_b.variable, bit_variable);
         right_variable = cs.add(b.variable, right_variable);
 
         (
@@ -500,7 +497,7 @@ mod test {
         let exp = 100u128;
         let b = a.pow(exp);
 
-        let cs = ConstraintSystemRef::new_ref();
+        let cs = ConstraintSystemRef::new_plonk_with_poseidon_ref();
 
         let a_var = QM31Var::new_witness(&cs, &a);
         let b_var = QM31Var::new_witness(&cs, &b);
@@ -511,7 +508,7 @@ mod test {
         cs.populate_logup_arguments();
         cs.check_poseidon_invocations();
 
-        let (plonk, mut poseidon) = cs.generate_circuit();
+        let (plonk, mut poseidon) = cs.generate_plonk_with_poseidon_circuit();
         let proof =
             prove_plonk_with_poseidon::<Poseidon31MerkleChannel>(config, &plonk, &mut poseidon);
         verify_plonk_with_poseidon::<Poseidon31MerkleChannel>(

@@ -143,12 +143,12 @@ pub fn complex_conjugate_line_coeffs_var(
     alpha: &QM31Var,
 ) -> (QM31Var, QM31Var, QM31Var) {
     assert_ne!(
-        point.y.value,
-        point.y.value.complex_conjugate(),
+        point.y.value(),
+        point.y.value().complex_conjugate(),
         "Cannot evaluate a line with a single point ({:?}).",
         CirclePoint {
-            x: point.x.value,
-            y: point.y.value
+            x: point.x.value(),
+            y: point.y.value()
         }
     );
 

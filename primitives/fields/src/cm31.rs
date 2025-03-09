@@ -29,7 +29,6 @@ impl AllocVar for CM31Var {
             let imag = M31Var::new_variables(cs, &value.1, mode);
 
             let res = cs.add(real.variable, cs.mul(imag.variable, 2));
-
             Self {
                 cs: cs.clone(),
                 value: *value,
@@ -89,9 +88,9 @@ impl Add<&M31Var> for &CM31Var {
     type Output = CM31Var;
 
     fn add(self, rhs: &M31Var) -> CM31Var {
-        let cs = self.cs.and(&rhs.cs);
+        let cs = self.cs().and(&rhs.cs);
         CM31Var {
-            cs: self.cs().and(&rhs.cs()),
+            cs: cs.clone(),
             value: self.value + rhs.value,
             variable: cs.add(self.variable, rhs.variable),
         }
@@ -110,7 +109,7 @@ impl Add<&CM31Var> for &CM31Var {
     type Output = CM31Var;
 
     fn add(self, rhs: &CM31Var) -> CM31Var {
-        let cs = self.cs.and(&rhs.cs);
+        let cs = self.cs().and(&rhs.cs());
         CM31Var {
             cs: cs.clone(),
             value: self.value + rhs.value,
@@ -147,7 +146,7 @@ impl Mul<&M31Var> for &CM31Var {
     type Output = CM31Var;
 
     fn mul(self, rhs: &M31Var) -> CM31Var {
-        let cs = self.cs.and(&rhs.cs);
+        let cs = self.cs().and(&rhs.cs);
         CM31Var {
             cs: cs.clone(),
             value: self.value * rhs.value,
@@ -168,7 +167,7 @@ impl Mul<&CM31Var> for &CM31Var {
     type Output = CM31Var;
 
     fn mul(self, rhs: &CM31Var) -> CM31Var {
-        let cs = self.cs.and(&rhs.cs);
+        let cs = self.cs().and(&rhs.cs());
         CM31Var {
             cs: cs.clone(),
             value: self.value * rhs.value,
@@ -193,6 +192,10 @@ impl Neg for &CM31Var {
 }
 
 impl CM31Var {
+    pub fn value(&self) -> CM31 {
+        self.value
+    }
+
     pub fn from_m31(real: &M31Var, imag: &M31Var) -> Self {
         let cs = real.cs().and(&imag.cs());
         let value = CM31::from_m31(real.value, imag.value);
@@ -238,7 +241,6 @@ impl CM31Var {
         let cs = self.cs();
         let value = self.value.inverse();
         let res = CM31Var::new_witness(&cs, &value);
-        cs.insert_gate(self.variable, res.variable, 1, M31::zero());
         res
     }
 
@@ -254,7 +256,6 @@ impl CM31Var {
     pub fn mul_constant_m31(&self, constant: M31) -> CM31Var {
         let cs = self.cs();
         let value = self.value * constant;
-
         CM31Var {
             cs: cs.clone(),
             value,
@@ -269,7 +270,6 @@ impl CM31Var {
         let b = self.mul_constant_m31(constant.1);
 
         let variable = cs.add(a.variable, cs.mul(b.variable, 2));
-
         CM31Var {
             cs,
             value: self.value * constant,

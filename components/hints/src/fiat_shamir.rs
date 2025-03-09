@@ -1,27 +1,27 @@
 use itertools::Itertools;
-use num_traits::Zero;
+use num_traits::{One, Zero};
 use std::collections::{BTreeMap, BTreeSet};
+use std::ops::{Add, Mul, Neg};
 use stwo_prover::constraint_framework::{Relation, PREPROCESSED_TRACE_IDX};
 use stwo_prover::core::air::{Component, Components};
-use stwo_prover::core::channel::{Channel, Poseidon31Channel};
+use stwo_prover::core::channel::{Channel, MerkleChannel};
 use stwo_prover::core::circle::CirclePoint;
 use stwo_prover::core::fields::m31::BaseField;
 use stwo_prover::core::fields::qm31::{SecureField, QM31};
 use stwo_prover::core::fields::secure_column::SECURE_EXTENSION_DEGREE;
-use stwo_prover::core::fields::FieldExpOps;
+use stwo_prover::core::fields::{Field, FieldExpOps};
 use stwo_prover::core::fri::{CirclePolyDegreeBound, FriVerifier};
 use stwo_prover::core::pcs::{CommitmentSchemeVerifier, PcsConfig, TreeSubspan, TreeVec};
-use stwo_prover::core::vcs::poseidon31_hash::Poseidon31Hash;
-use stwo_prover::core::vcs::poseidon31_merkle::{Poseidon31MerkleChannel, Poseidon31MerkleHasher};
+use stwo_prover::core::vcs::ops::MerkleHasher;
 use stwo_prover::core::ColumnVec;
 use stwo_prover::examples::plonk_with_poseidon::air::{
     PlonkWithPoseidonComponents, PlonkWithPoseidonProof,
 };
 use stwo_prover::examples::plonk_with_poseidon::plonk::PlonkWithAcceleratorLookupElements;
 
-pub struct FiatShamirHints {
-    pub preprocessed_commitment: Poseidon31Hash,
-    pub trace_commitment: Poseidon31Hash,
+pub struct FiatShamirHints<MC: MerkleChannel> {
+    pub preprocessed_commitment: <MC::H as MerkleHasher>::Hash,
+    pub trace_commitment: <MC::H as MerkleHasher>::Hash,
     pub log_size_plonk: u32,
     pub log_size_poseidon: u32,
     pub plonk_total_sum: SecureField,
@@ -30,9 +30,10 @@ pub struct FiatShamirHints {
     pub z: SecureField,
     pub random_coeff: SecureField,
     pub after_sampled_values_random_coeff: SecureField,
+    pub oods_t: SecureField,
     pub oods_point: CirclePoint<SecureField>,
-    pub first_layer_commitment: Poseidon31Hash,
-    pub inner_layer_commitments: Vec<Poseidon31Hash>,
+    pub first_layer_commitment: <MC::H as MerkleHasher>::Hash,
+    pub inner_layer_commitments: Vec<<MC::H as MerkleHasher>::Hash>,
     pub last_layer_evaluation: SecureField,
     pub fri_alphas: Vec<SecureField>,
 
@@ -56,18 +57,17 @@ pub struct FiatShamirHints {
     pub mask_plonk: TreeVec<Vec<Vec<isize>>>,
     pub mask_poseidon: TreeVec<Vec<Vec<isize>>>,
 
-    pub fri_verifier: FriVerifier<Poseidon31MerkleChannel>,
+    pub fri_verifier: FriVerifier<MC>,
 }
 
-impl FiatShamirHints {
+impl<MC: MerkleChannel> FiatShamirHints<MC> {
     pub fn new(
-        proof: &PlonkWithPoseidonProof<Poseidon31MerkleHasher>,
+        proof: &PlonkWithPoseidonProof<MC::H>,
         config: PcsConfig,
         inputs: &[(usize, QM31)],
-    ) -> FiatShamirHints {
-        let channel = &mut Poseidon31Channel::default();
-        let commitment_scheme =
-            &mut CommitmentSchemeVerifier::<Poseidon31MerkleChannel>::new(config);
+    ) -> FiatShamirHints<MC> {
+        let channel = &mut MC::C::default();
+        let commitment_scheme = &mut CommitmentSchemeVerifier::<MC>::new(config);
 
         let log_sizes = proof.stmt0.log_sizes();
 
@@ -129,7 +129,19 @@ impl FiatShamirHints {
         );
 
         // Draw OODS point.
-        let oods_point = CirclePoint::<SecureField>::get_random_point(channel);
+        let oods_t = channel.draw_felt();
+        let oods_point = {
+            let t_square = oods_t.square();
+
+            let one_plus_tsquared_inv = t_square.add(SecureField::one()).inverse();
+
+            let x = SecureField::one()
+                .add(t_square.neg())
+                .mul(one_plus_tsquared_inv);
+            let y = oods_t.double().mul(one_plus_tsquared_inv);
+
+            CirclePoint::<SecureField> { x, y }
+        };
 
         // Get mask sample points relative to oods point.
         let mut sample_points = components.mask_points(oods_point);
@@ -152,7 +164,7 @@ impl FiatShamirHints {
             .collect_vec();
 
         // FRI commitment phase on OODS quotients.
-        let mut fri_verifier = FriVerifier::<Poseidon31MerkleChannel>::commit(
+        let mut fri_verifier = FriVerifier::<MC>::commit(
             channel,
             config.fri_config,
             proof.stark_proof.fri_proof.clone(),
@@ -179,7 +191,12 @@ impl FiatShamirHints {
         let nonce = proof.stark_proof.proof_of_work;
         channel.mix_u64(nonce);
 
-        assert!(channel.trailing_zeros() >= config.pow_bits);
+        assert!(
+            channel.trailing_zeros() >= config.pow_bits,
+            "pow failed: {} < {}",
+            channel.trailing_zeros(),
+            config.pow_bits
+        );
 
         let trees_log_sizes = proof.stmt0.log_sizes();
 
@@ -242,6 +259,7 @@ impl FiatShamirHints {
             z: lookup_elements.0.z,
             random_coeff,
             after_sampled_values_random_coeff,
+            oods_t,
             oods_point,
             first_layer_commitment,
             inner_layer_commitments,

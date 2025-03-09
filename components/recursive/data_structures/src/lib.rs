@@ -5,7 +5,6 @@ use circle_plonk_dsl_constraint_system::ConstraintSystemRef;
 use circle_plonk_dsl_fields::{M31Var, QM31Var};
 use circle_plonk_dsl_hints::{DecommitHints, SinglePairMerkleProof, SinglePathMerkleProof};
 use circle_plonk_dsl_merkle::Poseidon31MerkleHasherVar;
-use num_traits::One;
 use std::collections::BTreeMap;
 use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::fri::FriProof;
@@ -311,7 +310,7 @@ impl SinglePathMerkleProofVar {
     pub fn verify(&mut self, root: &HashVar, query: &BitsVar) {
         // verify that the Merkle proof is valid
         self.value.verify();
-        assert_eq!(root.value, self.value.root.0);
+        assert_eq!(root.value(), self.value.root.0);
         assert_eq!(query.get_value().0, self.value.query as u32);
 
         let mut cur_hash = Poseidon31MerkleHasherVar::hash_m31_columns_get_rate(
@@ -342,13 +341,11 @@ impl SinglePathMerkleProofVar {
             }
         }
 
-        assert_eq!(cur_hash.value, root.value);
+        assert_eq!(cur_hash.value(), root.value());
 
         // check that the left_variable and right_variable are the same
         // as though in self.root
-        let cs = self.cs().and(&root.cs()).and(&query.cs());
-        cs.insert_gate(cur_hash.left_variable, 0, root.left_variable, M31::one());
-        cs.insert_gate(cur_hash.right_variable, 0, root.right_variable, M31::one());
+        cur_hash.equalverify(&root);
     }
 }
 
@@ -398,7 +395,7 @@ impl SinglePairMerkleProofVar {
     pub fn verify(&mut self, root: &HashVar, query: &BitsVar) {
         // verify that the Merkle proof is valid
         self.value.verify();
-        assert_eq!(root.value, self.value.root.0);
+        assert_eq!(root.value(), self.value.root.0);
         assert_eq!(query.get_value().0, self.value.query as u32);
 
         let cs = self.cs().and(&root.cs()).and(&query.cs());
@@ -454,13 +451,11 @@ impl SinglePairMerkleProofVar {
             }
         }
 
-        assert_eq!(self_hash.value, root.value);
+        assert_eq!(self_hash.value(), root.value());
 
         // check that the left_variable and right_variable are the same
         // as though in self.root
-        let cs = self.cs().and(&root.cs()).and(&query.cs());
-        cs.insert_gate(self_hash.left_variable, 0, root.left_variable, M31::one());
-        cs.insert_gate(self_hash.right_variable, 0, root.right_variable, M31::one());
+        self_hash.equalverify(&root);
     }
 }
 
@@ -529,19 +524,22 @@ mod test {
     use stwo_prover::core::fields::qm31::QM31;
     use stwo_prover::core::fri::FriConfig;
     use stwo_prover::core::pcs::PcsConfig;
-    use stwo_prover::core::vcs::poseidon31_merkle::Poseidon31MerkleHasher;
+    use stwo_prover::core::vcs::poseidon31_merkle::{
+        Poseidon31MerkleChannel, Poseidon31MerkleHasher,
+    };
     use stwo_prover::examples::plonk_with_poseidon::air::PlonkWithPoseidonProof;
 
     #[test]
     fn test_merkle_path_proof() {
         let proof: PlonkWithPoseidonProof<Poseidon31MerkleHasher> =
-            bincode::deserialize(include_bytes!("../../test_data/small_proof.bin")).unwrap();
+            bincode::deserialize(include_bytes!("../../../test_data/small_proof.bin")).unwrap();
         let config = PcsConfig {
             pow_bits: 20,
             fri_config: FriConfig::new(0, 5, 16),
         };
 
-        let fiat_shamir_hints = FiatShamirHints::new(&proof, config, &[(1, QM31::one())]);
+        let fiat_shamir_hints =
+            FiatShamirHints::<Poseidon31MerkleChannel>::new(&proof, config, &[(1, QM31::one())]);
 
         let max_log_size = *fiat_shamir_hints.n_columns_per_log_size[0]
             .keys()
@@ -562,7 +560,7 @@ mod test {
             proof.verify();
         }
 
-        let cs = ConstraintSystemRef::new_ref();
+        let cs = ConstraintSystemRef::new_plonk_with_poseidon_ref();
         let root = HashVar::new_witness(&cs, &proof.stark_proof.commitments[0].0);
         for proof in proofs.iter() {
             let mut proof_var = SinglePathMerkleProofVar::new(&cs, proof);
@@ -575,7 +573,7 @@ mod test {
     #[test]
     fn test_merkle_pair_proof() {
         let proof: PlonkWithPoseidonProof<Poseidon31MerkleHasher> =
-            bincode::deserialize(include_bytes!("../../test_data/small_proof.bin")).unwrap();
+            bincode::deserialize(include_bytes!("../../../test_data/small_proof.bin")).unwrap();
         let config = PcsConfig {
             pow_bits: 20,
             fri_config: FriConfig::new(0, 5, 16),
@@ -588,7 +586,7 @@ mod test {
             proof.verify();
         }
 
-        let cs = ConstraintSystemRef::new_ref();
+        let cs = ConstraintSystemRef::new_plonk_with_poseidon_ref();
         let root = HashVar::new_witness(&cs, &proof.stark_proof.fri_proof.first_layer.commitment.0);
         for proof in first_layer_hints.merkle_proofs.iter() {
             let mut proof_var = SinglePairMerkleProofVar::new(&cs, proof);
