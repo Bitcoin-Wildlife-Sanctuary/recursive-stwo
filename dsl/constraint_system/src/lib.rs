@@ -1,14 +1,11 @@
 use crate::dvar::AllocationMode;
-use num_traits::{One, Zero};
 use plonk_with_poseidon::PlonkWithPoseidonConstraintSystem;
 use plonk_without_poseidon::PlonkWithoutPoseidonConstraintSystem;
 use std::cell::RefCell;
-use std::ops::{Deref, DerefMut, Neg};
+use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
-use stwo_prover::core::backend::Column;
 use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::fields::qm31::QM31;
-use stwo_prover::examples::plonk::PlonkCircuitTrace;
 use stwo_prover::examples::plonk_with_poseidon::plonk::PlonkWithAcceleratorCircuitTrace;
 use stwo_prover::examples::plonk_with_poseidon::poseidon::{
     PoseidonEntry, PoseidonFlow, SwapOption,

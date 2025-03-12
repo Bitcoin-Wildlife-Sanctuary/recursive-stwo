@@ -428,10 +428,8 @@ impl PlonkWithoutPoseidonConstraintSystem {
             let op2 = self.op2[i];
             let op3 = self.op3[i];
             let op4 = self.op4[i];
-            let one_minus_op2 = M31::one() - op2;
             let one_minus_op3 = M31::one() - op3;
             let one_minus_op4 = M31::one() - op4;
-
             #[inline(always)]
             /// Applies the M4 MDS matrix described in <https://eprint.iacr.org/2023/323.pdf> 5.1.
             fn apply_m4<F>(x: [F; 4]) -> [F; 4]

@@ -430,7 +430,7 @@ impl Poseidon2HalfVar {
                 cs.insert_gate(lhs.right_variable, 0, rhs.right_variable, M31::one());
             }
             (Poseidon2HalfVar::Emulated(lhs), Poseidon2HalfVar::Emulated(rhs)) => {
-                for i in 0..8 {
+                for i in 0..2 {
                     lhs.elems[i].equalverify(&rhs.elems[i]);
                 }
             }

@@ -9,8 +9,11 @@ circle-plonk-dsl-hints = { path = "../../hints" }
 circle-plonk-dsl-fields = { path = "../../../primitives/fields" }
 circle-plonk-dsl-constraint-system = { path = "../../../dsl/constraint_system" }
 circle-plonk-dsl-channel = { path = "../../../primitives/channel" }
+circle-plonk-dsl-last-data-structures = { path = "../data_structures" }
 circle-plonk-dsl-circle = { path = "../../../primitives/circle" }
+circle-plonk-dsl-merkle = { path = "../../../primitives/merkle" }
 circle-plonk-dsl-bits = { path = "../../../primitives/bits" }
 circle-plonk-dsl-data-structures = { path = "../../recursive/data_structures" }
 bincode.workspace = true
 num-traits.workspace = true
+itertools.workspace = true
