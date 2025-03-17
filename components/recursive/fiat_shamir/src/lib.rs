@@ -2,9 +2,7 @@ use circle_plonk_dsl_bits::BitsVar;
 use circle_plonk_dsl_channel::{ChannelVar, HashVar};
 use circle_plonk_dsl_circle::CirclePointQM31Var;
 use circle_plonk_dsl_constraint_system::dvar::{AllocVar, DVar};
-use circle_plonk_dsl_data_structures::{
-    PlonkWithAcceleratorLookupElementsVar, PlonkWithPoseidonProofVar,
-};
+use circle_plonk_dsl_data_structures::{LookupElementsVar, PlonkWithPoseidonProofVar};
 use circle_plonk_dsl_fields::{M31Var, QM31Var};
 use circle_plonk_dsl_hints::FiatShamirHints;
 use stwo_prover::core::fields::qm31::QM31;
@@ -20,7 +18,7 @@ pub struct FiatShamirResults {
 
     pub plonk_total_sum: QM31Var,
     pub poseidon_total_sum: QM31Var,
-    pub lookup_elements: PlonkWithAcceleratorLookupElementsVar,
+    pub lookup_elements: LookupElementsVar,
     pub random_coeff: QM31Var,
     pub after_sampled_values_random_coeff: QM31Var,
     pub oods_point: CirclePointQM31Var,
@@ -53,7 +51,7 @@ impl FiatShamirResults {
         channel.mix_root(&mut trace_commitment);
 
         // Draw interaction elements.
-        let lookup_elements = PlonkWithAcceleratorLookupElementsVar::draw(&mut channel);
+        let lookup_elements = LookupElementsVar::draw(&mut channel);
 
         // Interaction trace.
         proof.stmt1.mix_into(&mut channel);

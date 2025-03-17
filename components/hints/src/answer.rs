@@ -41,7 +41,7 @@ impl<MC: MerkleChannel> AnswerHints<MC> {
             fiat_shamir_hints.column_log_sizes.clone(),
             samples,
             fiat_shamir_hints.after_sampled_values_random_coeff,
-            &fiat_shamir_hints.query_positions_per_log_size,
+            &fiat_shamir_hints.sorted_query_positions_per_log_size,
             proof.stark_proof.queried_values.clone(),
             fiat_shamir_hints.n_columns_per_log_size.as_ref(),
         )
@@ -66,7 +66,7 @@ impl<MC: MerkleChannel> AnswerHints<MC> {
                     .as_ref()
                     .map(|colums_log_sizes| *colums_log_sizes.get(log_size).unwrap_or(&0));
                 for query_position in
-                    fiat_shamir_hints.query_positions_per_log_size[log_size].iter()
+                    fiat_shamir_hints.sorted_query_positions_per_log_size[log_size].iter()
                 {
                     let queried_values_at_row = queried_values
                         .as_mut()

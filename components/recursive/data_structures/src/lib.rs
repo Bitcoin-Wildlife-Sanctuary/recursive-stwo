@@ -222,14 +222,14 @@ impl AllocVar for StarkProofVar {
 }
 
 #[derive(Debug, Clone)]
-pub struct PlonkWithAcceleratorLookupElementsVar {
+pub struct LookupElementsVar {
     pub cs: ConstraintSystemRef,
     pub z: QM31Var,
     pub alpha: QM31Var,
     pub alpha_powers: [QM31Var; 3],
 }
 
-impl DVar for PlonkWithAcceleratorLookupElementsVar {
+impl DVar for LookupElementsVar {
     type Value = PlonkWithAcceleratorLookupElements;
 
     fn cs(&self) -> ConstraintSystemRef {
@@ -237,12 +237,16 @@ impl DVar for PlonkWithAcceleratorLookupElementsVar {
     }
 }
 
-impl PlonkWithAcceleratorLookupElementsVar {
+impl LookupElementsVar {
     pub fn draw(channel: &mut ChannelVar) -> Self {
-        let cs = channel.cs();
         let [z, alpha] = channel.get_felts();
+        Self::from_z_and_alpha(z, alpha)
+    }
 
-        let mut alpha_powers = Vec::with_capacity(9);
+    pub fn from_z_and_alpha(z: QM31Var, alpha: QM31Var) -> Self {
+        let cs = z.cs().and(&alpha.cs());
+
+        let mut alpha_powers = Vec::with_capacity(3);
         alpha_powers.push(QM31Var::one(&cs));
         alpha_powers.push(alpha.clone());
 
@@ -548,7 +552,7 @@ mod test {
         let proofs = SinglePathMerkleProof::from_stwo_proof(
             max_log_size,
             &fiat_shamir_hints
-                .query_positions_per_log_size
+                .sorted_query_positions_per_log_size
                 .get(&max_log_size)
                 .unwrap(),
             &proof.stark_proof.queried_values[0],

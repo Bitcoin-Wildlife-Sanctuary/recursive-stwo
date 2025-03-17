@@ -14,4 +14,3 @@ circle-plonk-dsl-fields = { path = "../../../primitives/fields" }
 num-traits.workspace = true
 stwo-prover.workspace = true
 bincode.workspace = true
-indexmap.workspace = true

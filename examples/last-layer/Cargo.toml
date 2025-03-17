@@ -1,0 +1,8 @@
+[package]
+name = "circle-plonk-dsl-example-last-layer"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+stwo-prover.workspace = true
+circle-plonk-dsl-hints = { path = "../../components/hints" }

@@ -1,5 +1,5 @@
 use circle_plonk_dsl_constraint_system::dvar::DVar;
-use circle_plonk_dsl_data_structures::PlonkWithAcceleratorLookupElementsVar;
+use circle_plonk_dsl_data_structures::LookupElementsVar;
 use circle_plonk_dsl_fields::QM31Var;
 use stwo_prover::constraint_framework::preprocessed_columns::PreProcessedColumnId;
 use stwo_prover::constraint_framework::{
@@ -33,14 +33,14 @@ impl PointEvaluationAccumulatorVar {
 }
 
 pub struct RelationEntryVar<'a> {
-    pub relation: &'a PlonkWithAcceleratorLookupElementsVar,
+    pub relation: &'a LookupElementsVar,
     pub multiplicity: QM31Var,
     pub values: &'a [QM31Var],
 }
 
 impl<'a> RelationEntryVar<'a> {
     pub fn new(
-        relation: &'a PlonkWithAcceleratorLookupElementsVar,
+        relation: &'a LookupElementsVar,
         multiplicity: QM31Var,
         values: &'a [QM31Var],
     ) -> Self {

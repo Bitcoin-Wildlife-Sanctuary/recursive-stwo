@@ -4,9 +4,10 @@ members = [
     "dsl/constraint_system", "primitives/poseidon31", "primitives/fields", "primitives/channel", "primitives/query",
     "components/hints", "components/recursive/fiat_shamir", "components/recursive/composition", "components/recursive/data_structures",
     "components/recursive/answer", "components/recursive/folding",
-    "components/last/fiat_shamir", "components/last/data_structures",
+    "components/last/fiat_shamir", "components/last/data_structures", "components/last/composition",
+    "components/last/answer", "components/last/folding",
     "primitives/bits", "primitives/circle", "primitives/merkle",
-    "examples/single-proof", "examples/multi-proofs",
+    "examples/single-proof", "examples/multi-proofs", "examples/last-layer"
 ]
 
 [workspace.dependencies]

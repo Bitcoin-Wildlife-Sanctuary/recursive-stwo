@@ -1,5 +1,5 @@
 [package]
-name = "circle-plonk-dsl-last-fiat-shamir"
+name = "circle-plonk-dsl-last-composition"
 version = "0.1.0"
 edition = "2021"
 
@@ -8,11 +8,11 @@ stwo-prover.workspace = true
 circle-plonk-dsl-hints = { path = "../../hints" }
 circle-plonk-dsl-fields = { path = "../../../primitives/fields" }
 circle-plonk-dsl-constraint-system = { path = "../../../dsl/constraint_system" }
-circle-plonk-dsl-channel = { path = "../../../primitives/channel" }
+circle-plonk-dsl-last-fiat-shamir = { path = "../fiat_shamir" }
 circle-plonk-dsl-last-data-structures = { path = "../data_structures" }
-circle-plonk-dsl-circle = { path = "../../../primitives/circle" }
-circle-plonk-dsl-merkle = { path = "../../../primitives/merkle" }
 circle-plonk-dsl-data-structures = { path = "../../recursive/data_structures" }
-bincode.workspace = true
+circle-plonk-dsl-circle = { path = "../../../primitives/circle" }
+circle-plonk-dsl-composition = { path = "../../recursive/composition" }
 num-traits.workspace = true
+bincode.workspace = true
 itertools.workspace = true

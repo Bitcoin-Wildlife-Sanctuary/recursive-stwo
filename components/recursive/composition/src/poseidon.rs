@@ -1,6 +1,6 @@
 use crate::data_structures::{EvalAtRowVar, RelationEntryVar};
 use circle_plonk_dsl_constraint_system::dvar::DVar;
-use circle_plonk_dsl_data_structures::PlonkWithAcceleratorLookupElementsVar;
+use circle_plonk_dsl_data_structures::LookupElementsVar;
 use circle_plonk_dsl_fields::QM31Var;
 use stwo_prover::core::fields::m31::M31;
 use stwo_prover::examples::plonk_with_poseidon::poseidon::Poseidon;
@@ -71,7 +71,7 @@ fn pow5(x: QM31Var) -> QM31Var {
 }
 
 pub fn evaluate_poseidon<'a>(
-    lookup_elements: &PlonkWithAcceleratorLookupElementsVar,
+    lookup_elements: &LookupElementsVar,
     mut eval: EvalAtRowVar<'a>,
 ) -> EvalAtRowVar<'a> {
     let cs = lookup_elements.cs();

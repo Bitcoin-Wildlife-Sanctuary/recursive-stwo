@@ -218,7 +218,7 @@ impl DecommitHints {
             **v = SinglePathMerkleProof::from_stwo_proof(
                 max_log_size,
                 &fiat_shamir_hints
-                    .raw_query_positions_per_log_size
+                    .unsorted_query_positions_per_log_size
                     .get(&max_log_size)
                     .unwrap(),
                 &proof.stark_proof.queried_values[i],

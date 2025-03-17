@@ -40,7 +40,7 @@ impl FoldingResults {
             .zip(answer_results.fri_answers.iter())
         {
             for (i, (_, fri_answer)) in fiat_shamir_hints
-                .raw_query_positions_per_log_size
+                .unsorted_query_positions_per_log_size
                 .get(&log_size)
                 .unwrap()
                 .iter()
@@ -91,7 +91,7 @@ impl FoldingResults {
 
         for (log_size, folded_evals) in first_layer_hints.folded_evals_by_column.iter() {
             let folded_queries = fiat_shamir_hints
-                .raw_query_positions_per_log_size
+                .unsorted_query_positions_per_log_size
                 .get(&log_size)
                 .unwrap()
                 .iter()
@@ -124,7 +124,7 @@ impl FoldingResults {
 
         let mut folded = Vec::new();
         for _ in 0..fiat_shamir_hints
-            .raw_query_positions_per_log_size
+            .unsorted_query_positions_per_log_size
             .get(&log_size)
             .unwrap()
             .len()

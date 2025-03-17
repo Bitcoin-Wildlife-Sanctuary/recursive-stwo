@@ -3,9 +3,7 @@ use crate::plonk::evaluate_plonk;
 use crate::poseidon::evaluate_poseidon;
 use circle_plonk_dsl_circle::CirclePointQM31Var;
 use circle_plonk_dsl_constraint_system::dvar::DVar;
-use circle_plonk_dsl_data_structures::{
-    PlonkWithAcceleratorLookupElementsVar, PlonkWithPoseidonProofVar,
-};
+use circle_plonk_dsl_data_structures::{LookupElementsVar, PlonkWithPoseidonProofVar};
 use circle_plonk_dsl_fields::{M31Var, QM31Var};
 use circle_plonk_dsl_hints::FiatShamirHints;
 use itertools::Itertools;
@@ -35,7 +33,7 @@ pub struct CompositionCheck;
 impl CompositionCheck {
     pub fn compute(
         fiat_shamir_hints: &FiatShamirHints<Poseidon31MerkleChannel>,
-        lookup_elements: &PlonkWithAcceleratorLookupElementsVar,
+        lookup_elements: &LookupElementsVar,
         random_coeff: QM31Var,
         oods_point: CirclePointQM31Var,
         proof: &PlonkWithPoseidonProofVar,
@@ -121,9 +119,7 @@ mod test {
     use circle_plonk_dsl_circle::CirclePointQM31Var;
     use circle_plonk_dsl_constraint_system::dvar::AllocVar;
     use circle_plonk_dsl_constraint_system::ConstraintSystemRef;
-    use circle_plonk_dsl_data_structures::{
-        PlonkWithAcceleratorLookupElementsVar, PlonkWithPoseidonProofVar,
-    };
+    use circle_plonk_dsl_data_structures::{LookupElementsVar, PlonkWithPoseidonProofVar};
     use circle_plonk_dsl_fields::QM31Var;
     use circle_plonk_dsl_hints::FiatShamirHints;
     use num_traits::One;
@@ -154,7 +150,7 @@ mod test {
 
         CompositionCheck::compute(
             &fiat_shamir_hints,
-            &PlonkWithAcceleratorLookupElementsVar {
+            &LookupElementsVar {
                 cs: cs.clone(),
                 z: QM31Var::new_witness(&cs, &fiat_shamir_hints.z),
                 alpha: QM31Var::new_witness(&cs, &fiat_shamir_hints.alpha),

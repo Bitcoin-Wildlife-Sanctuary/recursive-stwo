@@ -331,7 +331,7 @@ impl FirstLayerHints {
             &answer_hints.fri_answers,
         ) {
             let queries =
-                &fiat_shamir_hints.query_positions_per_log_size[&column_domain.log_size()];
+                &fiat_shamir_hints.sorted_query_positions_per_log_size[&column_domain.log_size()];
 
             let (column_decommitment_positions, sparse_evaluation) =
                 Self::compute_decommitment_positions_and_rebuild_evals(
@@ -398,7 +398,7 @@ impl FirstLayerHints {
             &log_sizes_with_data,
             proof.stark_proof.fri_proof.first_layer.commitment,
             &fiat_shamir_hints
-                .raw_query_positions_per_log_size
+                .unsorted_query_positions_per_log_size
                 .get(&fiat_shamir_hints.max_first_layer_column_log_size)
                 .unwrap(),
             &decommitmented_values,
@@ -466,7 +466,7 @@ impl InnerLayersHints {
 
         let mut folded = BTreeMap::new();
         for i in fiat_shamir_hints
-            .raw_query_positions_per_log_size
+            .unsorted_query_positions_per_log_size
             .get(&log_size)
             .unwrap()
             .iter()
@@ -547,7 +547,7 @@ impl InnerLayersHints {
                 &BTreeSet::from([log_size]),
                 inner_layer.commitment.clone(),
                 &fiat_shamir_hints
-                    .raw_query_positions_per_log_size
+                    .unsorted_query_positions_per_log_size
                     .get(&fiat_shamir_hints.max_first_layer_column_log_size)
                     .unwrap()
                     .iter()

@@ -10,19 +10,19 @@ use stwo_prover::core::circle::CirclePoint;
 use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::poly::circle::CanonicCoset;
 
-pub struct QueryPositionsPerLogSize {
+pub struct QueryPositionsPerLogSizeVar {
     pub range: RangeInclusive<u32>,
-    pub points: BTreeMap<u32, Vec<PointCarryingQuery>>,
+    pub points: BTreeMap<u32, Vec<PointCarryingQueryVar>>,
 }
 
-impl QueryPositionsPerLogSize {
+impl QueryPositionsPerLogSizeVar {
     pub fn new(range: RangeInclusive<u32>, raw_queries: &[M31Var]) -> Self {
         let max_degree = *range.end();
         let min_degree = *range.start();
 
         let mut elems = vec![];
         for raw_query in raw_queries {
-            elems.push(PointCarryingQuery::new(
+            elems.push(PointCarryingQueryVar::new(
                 BitsVar::from_m31(&raw_query, 31).index_range(0..max_degree as usize),
             ));
         }
@@ -38,8 +38,8 @@ impl QueryPositionsPerLogSize {
     }
 }
 
-impl Index<u32> for QueryPositionsPerLogSize {
-    type Output = Vec<PointCarryingQuery>;
+impl Index<u32> for QueryPositionsPerLogSizeVar {
+    type Output = Vec<PointCarryingQueryVar>;
 
     fn index(&self, index: u32) -> &Self::Output {
         self.points.get(&index).unwrap()
@@ -47,13 +47,13 @@ impl Index<u32> for QueryPositionsPerLogSize {
 }
 
 #[derive(Clone)]
-pub struct PointCarryingQuery {
+pub struct PointCarryingQueryVar {
     pub bits: BitsVar,
     pub last_step: CirclePoint<M31>,
     pub point: CirclePointM31Var,
 }
 
-impl PointCarryingQuery {
+impl PointCarryingQueryVar {
     pub fn new(bits: BitsVar) -> Self {
         let cs = bits.cs();
         let log_size = bits.value.len() as u32;
@@ -130,7 +130,7 @@ impl PointCarryingQuery {
             }
         }
 
-        PointCarryingQuery {
+        PointCarryingQueryVar {
             bits,
             last_step: steps.last().unwrap().neg(),
             point: cur,

@@ -39,8 +39,8 @@ pub struct FiatShamirHints<MC: MerkleChannel> {
 
     pub all_log_sizes: BTreeSet<u32>,
     pub max_first_layer_column_log_size: u32,
-    pub query_positions_per_log_size: BTreeMap<u32, Vec<usize>>,
-    pub raw_query_positions_per_log_size: BTreeMap<u32, Vec<usize>>,
+    pub sorted_query_positions_per_log_size: BTreeMap<u32, Vec<usize>>,
+    pub unsorted_query_positions_per_log_size: BTreeMap<u32, Vec<usize>>,
     pub column_log_sizes: TreeVec<Vec<u32>>,
     pub n_columns_per_log_size: TreeVec<BTreeMap<u32, usize>>,
     pub trees_log_sizes: TreeVec<Vec<u32>>,
@@ -209,7 +209,7 @@ impl<MC: MerkleChannel> FiatShamirHints<MC> {
         let max_first_layer_column_log_size = *all_log_sizes.iter().max().unwrap();
 
         // Get FRI query positions.
-        let raw_query_positions_per_log_size = {
+        let unsorted_query_positions_per_log_size = {
             let mut channel = channel.clone();
             let mut raw_queries = vec![];
 
@@ -237,7 +237,7 @@ impl<MC: MerkleChannel> FiatShamirHints<MC> {
             }
             map
         };
-        let query_positions_per_log_size = fri_verifier.sample_query_positions(channel);
+        let sorted_query_positions_per_log_size = fri_verifier.sample_query_positions(channel);
 
         let column_log_sizes = commitment_scheme
             .trees
@@ -268,8 +268,8 @@ impl<MC: MerkleChannel> FiatShamirHints<MC> {
 
             all_log_sizes,
             max_first_layer_column_log_size,
-            raw_query_positions_per_log_size,
-            query_positions_per_log_size,
+            unsorted_query_positions_per_log_size,
+            sorted_query_positions_per_log_size,
             column_log_sizes,
             n_columns_per_log_size,
             trees_log_sizes,
