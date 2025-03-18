@@ -1,26 +1,20 @@
 use circle_plonk_dsl_constraint_system::dvar::{AllocVar, AllocationMode, DVar};
 use circle_plonk_dsl_constraint_system::ConstraintSystemRef;
 use circle_plonk_dsl_fields::QM31Var;
-use circle_plonk_dsl_hints::{
-    AnswerHints, FiatShamirHints, FirstLayerHints, SinglePairMerkleProof,
-};
+use circle_plonk_dsl_hints::{AnswerHints, FiatShamirHints, FirstLayerHints};
 use itertools::{zip_eq, Itertools};
 use num_traits::Zero;
 use std::collections::{BTreeMap, BTreeSet};
 use stwo_prover::core::circle::Coset;
 use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::fields::qm31::{SecureField, QM31};
-use stwo_prover::core::fields::secure_column::SECURE_EXTENSION_DEGREE;
 use stwo_prover::core::fields::FieldExpOps;
 use stwo_prover::core::utils::bit_reverse_index;
-use stwo_prover::core::vcs::poseidon31_merkle::{Poseidon31MerkleChannel, Poseidon31MerkleHasher};
 use stwo_prover::core::vcs::prover::MerkleDecommitment;
 use stwo_prover::core::vcs::sha256_poseidon31_merkle::{
     Sha256Poseidon31MerkleChannel, Sha256Poseidon31MerkleHasher,
 };
-use stwo_prover::core::vcs::verifier::MerkleVerifier;
 use stwo_prover::examples::plonk_with_poseidon::air::PlonkWithPoseidonProof;
-use stwo_prover::examples::plonk_without_poseidon::air::PlonkWithoutPoseidonProof;
 
 #[derive(Clone, Debug)]
 pub struct LastSinglePairMerkleProof {
@@ -170,7 +164,7 @@ impl LastFirstLayerHints {
     pub fn compute(
         fiat_shamir_hints: &FiatShamirHints<Sha256Poseidon31MerkleChannel>,
         answer_hints: &AnswerHints<Sha256Poseidon31MerkleChannel>,
-        proof: &PlonkWithoutPoseidonProof<Sha256Poseidon31MerkleHasher>,
+        proof: &PlonkWithPoseidonProof<Sha256Poseidon31MerkleHasher>,
     ) -> LastFirstLayerHints {
         // Columns are provided in descending order by size.
         let max_column_log_size = fiat_shamir_hints
@@ -294,17 +288,17 @@ impl AllocVar for LastFirstLayerInputVar {
 }
 
 #[derive(Clone, Debug)]
-pub struct InnerLayersHints {
+pub struct LastInnerLayersHints {
     pub merkle_proofs: BTreeMap<u32, Vec<LastSinglePairMerkleProof>>,
     pub folded_intermediate_results: BTreeMap<u32, BTreeMap<usize, SecureField>>,
 }
 
-impl InnerLayersHints {
+impl LastInnerLayersHints {
     pub fn compute(
         folded_evals_by_column: &BTreeMap<u32, Vec<SecureField>>,
         fiat_shamir_hints: &FiatShamirHints<Sha256Poseidon31MerkleChannel>,
         proof: &PlonkWithPoseidonProof<Sha256Poseidon31MerkleHasher>,
-    ) -> InnerLayersHints {
+    ) -> LastInnerLayersHints {
         let mut log_size = fiat_shamir_hints.max_first_layer_column_log_size;
 
         let mut folded = BTreeMap::new();
@@ -366,8 +360,6 @@ impl InnerLayersHints {
 
                 new_folded.insert(folded_query, folded_value);
             }
-
-            let decommitment_positions = decommitmented.keys().copied().collect_vec();
             let decommitmented_values = decommitmented
                 .values()
                 .map(|v| v.to_m31_array())
@@ -405,15 +397,35 @@ impl InnerLayersHints {
 }
 
 #[derive(Debug, Clone)]
-pub struct InnerLayersInputVar {
+pub struct LastInnerLayersInputVar {
     pub cs: ConstraintSystemRef,
     pub merkle_proofs: BTreeMap<u32, Vec<LastSinglePairMerkleProofVar>>,
 }
 
-impl DVar for InnerLayersInputVar {
-    type Value = InnerLayersHints;
+impl DVar for LastInnerLayersInputVar {
+    type Value = LastInnerLayersHints;
 
     fn cs(&self) -> ConstraintSystemRef {
         self.cs.clone()
+    }
+}
+
+impl AllocVar for LastInnerLayersInputVar {
+    fn new_variables(cs: &ConstraintSystemRef, value: &Self::Value, mode: AllocationMode) -> Self {
+        let mut merkle_proofs = BTreeMap::new();
+        for (log_size, proofs) in value.merkle_proofs.iter() {
+            merkle_proofs.insert(
+                *log_size,
+                proofs
+                    .iter()
+                    .map(|v| LastSinglePairMerkleProofVar::new_variables(cs, v, mode))
+                    .collect_vec(),
+            );
+        }
+
+        Self {
+            cs: cs.clone(),
+            merkle_proofs,
+        }
     }
 }

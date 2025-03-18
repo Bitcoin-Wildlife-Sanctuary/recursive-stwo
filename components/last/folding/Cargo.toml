@@ -8,5 +8,9 @@ stwo-prover.workspace = true
 circle-plonk-dsl-hints = { path = "../../hints" }
 circle-plonk-dsl-fields = { path = "../../../primitives/fields" }
 circle-plonk-dsl-constraint-system = { path = "../../../dsl/constraint_system" }
+circle-plonk-dsl-last-data-structures = { path = "../data_structures" }
+circle-plonk-dsl-last-fiat-shamir = { path = "../fiat_shamir" }
+circle-plonk-dsl-last-answer = { path = "../answer" }
 itertools.workspace = true
 num-traits.workspace = true
+bincode.workspace = true
