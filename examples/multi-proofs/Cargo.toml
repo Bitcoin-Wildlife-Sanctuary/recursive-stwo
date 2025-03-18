@@ -12,7 +12,7 @@ circle-plonk-dsl-data-structures = { path = "../../components/recursive/data_str
 circle-plonk-dsl-fiat-shamir = { path = "../../components/recursive/fiat_shamir" }
 stwo-prover.workspace = true
 bincode.workspace = true
-circle-plonk-dsl-constraint-system = { path = "../../dsl/constraint_system" }
+circle-plonk-dsl-constraint-system = { path = "../../constraint_system" }
 circle-plonk-dsl-circle = { path = "../../primitives/circle" }
 circle-plonk-dsl-fields = { path = "../../primitives/fields" }
 num-traits.workspace = true

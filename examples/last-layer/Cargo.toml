@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 circle-plonk-dsl-hints = { path = "../../components/hints" }
-circle-plonk-dsl-constraint-system = { path = "../../dsl/constraint_system" }
+circle-plonk-dsl-constraint-system = { path = "../../constraint_system" }
 circle-plonk-dsl-last-data-structures = { path = "../../components/last/data_structures" }
 circle-plonk-dsl-last-fiat-shamir = { path = "../../components/last/fiat_shamir" }
 circle-plonk-dsl-last-answer = { path = "../../components/last/answer" }

@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 stwo-prover.workspace = true
-circle-plonk-dsl-constraint-system = { path = "../../dsl/constraint_system" }
+circle-plonk-dsl-constraint-system = { path = "../../constraint_system" }
 circle-plonk-dsl-fields = { path = "../fields" }
 circle-plonk-dsl-channel = { path = "../channel" }
 circle-plonk-dsl-bits = { path = "../bits" }

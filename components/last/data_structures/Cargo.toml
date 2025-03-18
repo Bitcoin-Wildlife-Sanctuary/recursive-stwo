@@ -6,5 +6,5 @@ edition = "2021"
 [dependencies]
 stwo-prover.workspace = true
 circle-plonk-dsl-fields = { path = "../../../primitives/fields" }
-circle-plonk-dsl-constraint-system = { path = "../../../dsl/constraint_system" }
+circle-plonk-dsl-constraint-system = { path = "../../../constraint_system" }
 circle-plonk-dsl-data-structures = { path = "../../recursive/data_structures" }

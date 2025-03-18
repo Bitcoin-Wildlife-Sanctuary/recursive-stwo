@@ -10,7 +10,7 @@ circle-plonk-dsl-circle = { path = "../../../primitives/circle" }
 circle-plonk-dsl-hints = { path = "../../hints" }
 circle-plonk-dsl-fields = { path = "../../../primitives/fields" }
 circle-plonk-dsl-data-structures = { path = "../data_structures" }
-circle-plonk-dsl-constraint-system = { path = "../../../dsl/constraint_system" }
+circle-plonk-dsl-constraint-system = { path = "../../../constraint_system" }
 circle-plonk-dsl-query = { path = "../../../primitives/query" }
 bincode.workspace = true
 num-traits.workspace = true
