@@ -89,9 +89,9 @@ impl<MC: MerkleChannel> FiatShamirHints<MC> {
             PlonkWithPoseidonComponents::new(&proof.stmt0, &lookup_elements, &proof.stmt1);
 
         let plonk_tree_subspan = components.plonk.trace_locations().to_vec();
-        let plonk_prepared_column_indices = components.plonk.preproccessed_column_indices();
+        let plonk_prepared_column_indices = components.plonk.preproccessed_column_indices().to_vec();
         let poseidon_tree_subspan = components.poseidon.trace_locations().to_vec();
-        let poseidon_prepared_column_indices = components.poseidon.preproccessed_column_indices();
+        let poseidon_prepared_column_indices = components.poseidon.preproccessed_column_indices().to_vec();
 
         // Get the mask relations
         let mask_plonk = components.plonk.info.mask_offsets.clone();
