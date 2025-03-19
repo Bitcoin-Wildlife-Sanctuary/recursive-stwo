@@ -127,7 +127,7 @@ mod test {
             bincode::deserialize(include_bytes!("../../../test_data/hybrid_hash.bin")).unwrap();
         let config = PcsConfig {
             pow_bits: 28,
-            fri_config: FriConfig::new(0, 9, 8),
+            fri_config: FriConfig::new(7, 9, 8),
         };
 
         verify_plonk_with_poseidon::<Sha256Poseidon31MerkleChannel>(

@@ -10,6 +10,7 @@ circle-plonk-dsl-constraint-system = { path = "../../../constraint_system" }
 circle-plonk-dsl-channel = { path = "../../../primitives/channel" }
 circle-plonk-dsl-hints = { path = "../../hints" }
 circle-plonk-dsl-bits = { path = "../../../primitives/bits" }
+circle-plonk-dsl-line = { path = "../../../primitives/line" }
 circle-plonk-dsl-merkle = { path = "../../../primitives/merkle" }
 num-traits.workspace = true
 

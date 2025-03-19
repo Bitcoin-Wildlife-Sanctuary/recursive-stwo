@@ -27,7 +27,7 @@ fn main() {
     .unwrap();
     let config = PcsConfig {
         pow_bits: 20,
-        fri_config: FriConfig::new(0, 5, 16),
+        fri_config: FriConfig::new(2, 5, 16),
     };
 
     let fiat_shamir_hints = FiatShamirHints::new(&proof, config, &[(1, QM31::one())]);
@@ -88,7 +88,14 @@ fn main() {
     cs.check_poseidon_invocations();
 
     let (plonk, mut poseidon) = cs.generate_plonk_with_poseidon_circuit();
-    let proof = prove_plonk_with_poseidon::<Poseidon31MerkleChannel>(config, &plonk, &mut poseidon);
+
+    let dest_config = PcsConfig {
+        pow_bits: 20,
+        fri_config: FriConfig::new(8, 5, 16),
+    };
+
+    let proof =
+        prove_plonk_with_poseidon::<Poseidon31MerkleChannel>(dest_config, &plonk, &mut poseidon);
 
     let path = format!(
         "../../components/test_data/recursive_proof_{}_{}.bin",
@@ -102,7 +109,7 @@ fn main() {
 
     verify_plonk_with_poseidon::<Poseidon31MerkleChannel>(
         proof,
-        config,
+        dest_config,
         &[
             (1, QM31::one()),
             (2, QM31::from_u32_unchecked(0, 1, 0, 0)),

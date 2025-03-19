@@ -3,7 +3,7 @@ use num_traits::{One, Zero};
 use std::collections::{BTreeMap, BTreeSet};
 use std::ops::{Add, Mul, Neg};
 use stwo_prover::constraint_framework::{Relation, PREPROCESSED_TRACE_IDX};
-use stwo_prover::core::air::{Component, Components};
+use stwo_prover::core::air::Components;
 use stwo_prover::core::channel::{Channel, MerkleChannel};
 use stwo_prover::core::circle::CirclePoint;
 use stwo_prover::core::fields::m31::BaseField;
@@ -34,7 +34,7 @@ pub struct FiatShamirHints<MC: MerkleChannel> {
     pub oods_point: CirclePoint<SecureField>,
     pub first_layer_commitment: <MC::H as MerkleHasher>::Hash,
     pub inner_layer_commitments: Vec<<MC::H as MerkleHasher>::Hash>,
-    pub last_layer_evaluation: SecureField,
+    pub last_layer_coeffs: Vec<SecureField>,
     pub fri_alphas: Vec<SecureField>,
 
     pub all_log_sizes: BTreeSet<u32>,
@@ -89,9 +89,11 @@ impl<MC: MerkleChannel> FiatShamirHints<MC> {
             PlonkWithPoseidonComponents::new(&proof.stmt0, &lookup_elements, &proof.stmt1);
 
         let plonk_tree_subspan = components.plonk.trace_locations().to_vec();
-        let plonk_prepared_column_indices = components.plonk.preproccessed_column_indices().to_vec();
+        let plonk_prepared_column_indices =
+            components.plonk.preproccessed_column_indices().to_vec();
         let poseidon_tree_subspan = components.poseidon.trace_locations().to_vec();
-        let poseidon_prepared_column_indices = components.poseidon.preproccessed_column_indices().to_vec();
+        let poseidon_prepared_column_indices =
+            components.poseidon.preproccessed_column_indices().to_vec();
 
         // Get the mask relations
         let mask_plonk = components.plonk.info.mask_offsets.clone();
@@ -180,8 +182,11 @@ impl<MC: MerkleChannel> FiatShamirHints<MC> {
             .iter()
             .map(|l| l.commitment)
             .collect_vec();
-        assert_eq!(proof.stark_proof.fri_proof.last_layer_poly.len(), 1);
-        let last_layer_evaluation = proof.stark_proof.fri_proof.last_layer_poly.coeffs[0].clone();
+        assert_eq!(
+            proof.stark_proof.fri_proof.last_layer_poly.len(),
+            1 << config.fri_config.log_last_layer_degree_bound
+        );
+        let last_layer_evaluation = proof.stark_proof.fri_proof.last_layer_poly.coeffs.clone();
 
         let mut fri_alphas = vec![];
         fri_alphas.push(fri_verifier.first_layer.folding_alpha);
@@ -263,7 +268,7 @@ impl<MC: MerkleChannel> FiatShamirHints<MC> {
             oods_point,
             first_layer_commitment,
             inner_layer_commitments,
-            last_layer_evaluation,
+            last_layer_coeffs: last_layer_evaluation,
             fri_alphas,
 
             all_log_sizes,

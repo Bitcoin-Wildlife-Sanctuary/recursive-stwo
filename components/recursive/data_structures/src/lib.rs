@@ -4,6 +4,7 @@ use circle_plonk_dsl_constraint_system::dvar::{AllocVar, AllocationMode, DVar};
 use circle_plonk_dsl_constraint_system::ConstraintSystemRef;
 use circle_plonk_dsl_fields::{M31Var, QM31Var};
 use circle_plonk_dsl_hints::{DecommitHints, SinglePairMerkleProof, SinglePathMerkleProof};
+use circle_plonk_dsl_line::LinePolyVar;
 use circle_plonk_dsl_merkle::Poseidon31MerkleHasherVar;
 use std::collections::BTreeMap;
 use stwo_prover::core::fields::m31::M31;
@@ -123,7 +124,7 @@ pub struct FriProofVar {
     pub cs: ConstraintSystemRef,
     pub first_layer_commitment: HashVar,
     pub inner_layer_commitments: Vec<HashVar>,
-    pub last_poly: QM31Var,
+    pub last_poly: LinePolyVar,
 }
 
 impl DVar for FriProofVar {
@@ -142,7 +143,7 @@ impl AllocVar for FriProofVar {
         for layer in value.inner_layers.iter() {
             inner_layer_commitments.push(HashVar::new_variables(cs, &layer.commitment.0, mode));
         }
-        let last_poly = QM31Var::new_variables(cs, &value.last_layer_poly.coeffs[0], mode);
+        let last_poly = LinePolyVar::new_variables(cs, &value.last_layer_poly, mode);
 
         Self {
             cs: cs.clone(),
@@ -539,7 +540,7 @@ mod test {
             bincode::deserialize(include_bytes!("../../../test_data/small_proof.bin")).unwrap();
         let config = PcsConfig {
             pow_bits: 20,
-            fri_config: FriConfig::new(0, 5, 16),
+            fri_config: FriConfig::new(2, 5, 16),
         };
 
         let fiat_shamir_hints =
@@ -580,7 +581,7 @@ mod test {
             bincode::deserialize(include_bytes!("../../../test_data/small_proof.bin")).unwrap();
         let config = PcsConfig {
             pow_bits: 20,
-            fri_config: FriConfig::new(0, 5, 16),
+            fri_config: FriConfig::new(2, 5, 16),
         };
 
         let fiat_shamir_hints = FiatShamirHints::new(&proof, config, &[(1, QM31::one())]);

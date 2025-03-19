@@ -137,10 +137,16 @@ impl PointCarryingQueryVar {
         }
     }
 
-    pub fn get_point(&self) -> CirclePointM31Var {
+    pub fn get_next_point(&self) -> CirclePointM31Var {
         self.point
             .double()
             .conditional_negate(self.bits.value[0], self.bits.variables[0])
+    }
+
+    pub fn get_next_point_x(&self) -> M31Var {
+        let xx = &self.point.x * &self.point.x;
+        let yy = &self.point.y * &self.point.y;
+        &xx - &yy
     }
 
     pub fn next(&mut self) {

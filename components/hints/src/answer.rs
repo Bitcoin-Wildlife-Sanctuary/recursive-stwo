@@ -110,7 +110,7 @@ mod test {
             bincode::deserialize(include_bytes!("../../test_data/small_proof.bin")).unwrap();
         let config = PcsConfig {
             pow_bits: 20,
-            fri_config: FriConfig::new(0, 5, 16),
+            fri_config: FriConfig::new(2, 5, 16),
         };
 
         let fiat_shamir_hints =

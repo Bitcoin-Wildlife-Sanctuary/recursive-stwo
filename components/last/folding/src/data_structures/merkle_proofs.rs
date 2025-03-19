@@ -5,10 +5,10 @@ use circle_plonk_dsl_hints::{AnswerHints, FiatShamirHints, FirstLayerHints};
 use itertools::{zip_eq, Itertools};
 use num_traits::Zero;
 use std::collections::{BTreeMap, BTreeSet};
-use stwo_prover::core::circle::Coset;
+use stwo_prover::core::circle::{CirclePoint, Coset};
 use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::fields::qm31::{SecureField, QM31};
-use stwo_prover::core::fields::FieldExpOps;
+use stwo_prover::core::fields::{ExtensionOf, Field, FieldExpOps};
 use stwo_prover::core::utils::bit_reverse_index;
 use stwo_prover::core::vcs::prover::MerkleDecommitment;
 use stwo_prover::core::vcs::sha256_poseidon31_merkle::{
@@ -385,8 +385,32 @@ impl LastInnerLayersHints {
             folded = new_folded;
         }
 
-        for (_, v) in folded.iter() {
-            assert_eq!(v, &fiat_shamir_hints.last_layer_evaluation);
+        log_size -= 1;
+        let domain = Coset::half_odds(log_size);
+        for (&idx, v) in folded.iter() {
+            let mut x = domain.at(bit_reverse_index(idx, log_size)).x;
+            let last_poly_log_size = fiat_shamir_hints.last_layer_coeffs.len().ilog2();
+            let mut doublings = Vec::new();
+            for _ in 0..last_poly_log_size {
+                doublings.push(x);
+                x = CirclePoint::<M31>::double_x(x);
+            }
+
+            pub fn fold<F: Field, E: ExtensionOf<F>>(values: &[E], folding_factors: &[F]) -> E {
+                let n = values.len();
+                assert_eq!(n, 1 << folding_factors.len());
+                if n == 1 {
+                    return values[0].into();
+                }
+                let (lhs_values, rhs_values) = values.split_at(n / 2);
+                let (folding_factor, folding_factors) = folding_factors.split_first().unwrap();
+                let lhs_val = fold(lhs_values, folding_factors);
+                let rhs_val = fold(rhs_values, folding_factors);
+                lhs_val + rhs_val * *folding_factor
+            }
+
+            let res = fold(&fiat_shamir_hints.last_layer_coeffs, &doublings);
+            assert_eq!(*v, res);
         }
 
         Self {

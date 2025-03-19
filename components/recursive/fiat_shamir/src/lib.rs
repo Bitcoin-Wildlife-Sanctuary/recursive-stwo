@@ -90,7 +90,14 @@ impl FiatShamirResults {
             channel.mix_root(l);
             fri_alphas.push(channel.get_felts()[0].clone());
         }
-        channel.absorb_one_felt_and_permute(&proof.stark_proof.fri_proof.last_poly);
+
+        for chunk in proof.stark_proof.fri_proof.last_poly.coeffs.chunks(2) {
+            if chunk.len() == 1 {
+                channel.absorb_one_felt_and_permute(&chunk[0]);
+            } else {
+                channel.absorb_two_felts_and_permute(&chunk[0], &chunk[1]);
+            }
+        }
 
         let nonce_felt = QM31Var::from_m31(
             &proof.stark_proof.proof_of_work[0],
@@ -194,7 +201,7 @@ mod test {
             bincode::deserialize(include_bytes!("../../../test_data/small_proof.bin")).unwrap();
         let config = PcsConfig {
             pow_bits: 20,
-            fri_config: FriConfig::new(0, 5, 16),
+            fri_config: FriConfig::new(2, 5, 16),
         };
 
         let fiat_shamir_hints = FiatShamirHints::new(&proof, config, &[(1, QM31::one())]);

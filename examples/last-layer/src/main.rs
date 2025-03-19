@@ -35,7 +35,7 @@ fn main() {
 
     let config = PcsConfig {
         pow_bits: 28,
-        fri_config: FriConfig::new(0, 9, 8),
+        fri_config: FriConfig::new(7, 9, 8),
     };
 
     let cs = ConstraintSystemRef::new_plonk_without_poseidon_ref();
@@ -183,6 +183,7 @@ fn main() {
             }
         }
     }
+    println!("input length: {} QM31", inputs.len());
 
     if std::fs::exists("data/bitcoin_proof.bin").unwrap() {
         return;

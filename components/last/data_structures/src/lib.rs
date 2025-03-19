@@ -4,6 +4,7 @@ use circle_plonk_dsl_data_structures::{
     PlonkWithPoseidonStatement0Var, PlonkWithPoseidonStatement1Var,
 };
 use circle_plonk_dsl_fields::QM31Var;
+use circle_plonk_dsl_line::LinePolyVar;
 use stwo_prover::core::pcs::TreeVec;
 use stwo_prover::core::prover::StarkProof;
 use stwo_prover::core::vcs::sha256_poseidon31_merkle::Sha256Poseidon31MerkleHasher;
@@ -46,7 +47,7 @@ impl AllocVar for LastPlonkWithPoseidonProofVar {
 pub struct LastStarkProofVar {
     pub cs: ConstraintSystemRef,
     pub sampled_values: TreeVec<ColumnVec<Vec<QM31Var>>>,
-    pub last_poly: QM31Var,
+    pub last_poly: LinePolyVar,
 }
 
 impl DVar for LastStarkProofVar {
@@ -71,8 +72,7 @@ impl AllocVar for LastStarkProofVar {
             }
             sampled_values.push(round_res);
         }
-        let last_poly =
-            QM31Var::new_variables(cs, &value.fri_proof.last_layer_poly.coeffs[0], mode);
+        let last_poly = LinePolyVar::new_variables(cs, &value.fri_proof.last_layer_poly, mode);
 
         Self {
             cs: cs.clone(),

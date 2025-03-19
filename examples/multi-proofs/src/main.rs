@@ -152,27 +152,27 @@ pub fn demo_recurse<C: MerkleChannel>(
 fn main() {
     let standard_config = PcsConfig {
         pow_bits: 20,
-        fri_config: FriConfig::new(0, 5, 16),
+        fri_config: FriConfig::new(8, 5, 16),
     };
     let fast_prover_config = PcsConfig {
         pow_bits: 20,
-        fri_config: FriConfig::new(0, 1, 80),
+        fri_config: FriConfig::new(8, 1, 80),
     };
     let fast_prover2_config = PcsConfig {
         pow_bits: 20,
-        fri_config: FriConfig::new(0, 3, 27),
+        fri_config: FriConfig::new(8, 3, 27),
     };
     let fast_verifier_config = PcsConfig {
         pow_bits: 23,
-        fri_config: FriConfig::new(0, 7, 11),
+        fri_config: FriConfig::new(8, 7, 11),
     };
     let fast_verifier2_config = PcsConfig {
         pow_bits: 20,
-        fri_config: FriConfig::new(0, 8, 10),
+        fri_config: FriConfig::new(8, 8, 10),
     };
     let fast_verifier3_config = PcsConfig {
         pow_bits: 28,
-        fri_config: FriConfig::new(0, 9, 8),
+        fri_config: FriConfig::new(7, 9, 8),
     };
 
     demo_recurse::<Poseidon31MerkleChannel>(

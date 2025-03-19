@@ -178,8 +178,16 @@ impl LastFoldingResults {
             folded = new_folded;
         }
 
-        for v in folded.iter() {
-            v.equalverify(&proof.stark_proof.last_poly);
+        let queries = answer_results.query_positions_per_log_size[log_size].clone();
+
+        for (query, v) in queries.iter().zip(folded.iter()) {
+            if proof.stark_proof.last_poly.coeffs.len() == 1 {
+                v.equalverify(&proof.stark_proof.last_poly.coeffs[0]);
+            } else {
+                let x = query.get_next_point_x();
+                let eval = proof.stark_proof.last_poly.eval_at_point(&x);
+                v.equalverify(&eval);
+            }
         }
     }
 }
@@ -222,7 +230,7 @@ mod test {
             bincode::deserialize(include_bytes!("../../../test_data/hybrid_hash.bin")).unwrap();
         let config = PcsConfig {
             pow_bits: 28,
-            fri_config: FriConfig::new(0, 9, 8),
+            fri_config: FriConfig::new(7, 9, 8),
         };
 
         verify_plonk_with_poseidon::<Sha256Poseidon31MerkleChannel>(
@@ -384,6 +392,7 @@ mod test {
                 }
             }
         }
+        println!("input length: {} QM31", inputs.len());
 
         let circuit = cs.generate_plonk_without_poseidon_circuit();
         let proof = prove_plonk_without_poseidon::<Sha256MerkleChannel>(config, &circuit);

@@ -191,8 +191,16 @@ impl FoldingResults {
             folded = new_folded;
         }
 
-        for v in folded.iter() {
-            v.equalverify(&proof_var.stark_proof.fri_proof.last_poly);
+        let queries = answer_results.query_positions_per_log_size[log_size].clone();
+
+        for (query, v) in queries.iter().zip(folded.iter()) {
+            if proof_var.stark_proof.fri_proof.last_poly.coeffs.len() == 1 {
+                v.equalverify(&proof_var.stark_proof.fri_proof.last_poly.coeffs[0]);
+            } else {
+                let x = query.get_next_point_x();
+                let eval = proof_var.stark_proof.fri_proof.last_poly.eval_at_point(&x);
+                v.equalverify(&eval);
+            }
         }
     }
 }
@@ -227,7 +235,7 @@ mod test {
             bincode::deserialize(include_bytes!("../../../test_data/small_proof.bin")).unwrap();
         let config = PcsConfig {
             pow_bits: 20,
-            fri_config: FriConfig::new(0, 5, 16),
+            fri_config: FriConfig::new(2, 5, 16),
         };
 
         verify_plonk_with_poseidon::<Poseidon31MerkleChannel>(

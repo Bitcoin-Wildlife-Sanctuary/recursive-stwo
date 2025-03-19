@@ -173,8 +173,9 @@ impl AnswerResults {
             });
 
         let query_positions_per_log_size = QueryPositionsPerLogSizeVar::new(
-            pcs_config.fri_config.log_blowup_factor + 1
-                ..=fiat_shamir_hints.max_first_layer_column_log_size,
+            pcs_config.fri_config.log_last_layer_degree_bound
+                + pcs_config.fri_config.log_blowup_factor
+                + 1..=fiat_shamir_hints.max_first_layer_column_log_size,
             &fiat_shamir_results.raw_queries,
         );
 
@@ -367,7 +368,7 @@ impl AnswerResults {
         for (query_position, queried_values_at_row) in
             query_positions.iter().zip(queried_values.iter())
         {
-            let domain_point = query_position.get_point();
+            let domain_point = query_position.get_next_point();
             quotient_evals_at_queries.push(accumulate_row_quotients_var(
                 &sample_batches,
                 &queried_values_at_row,
@@ -408,7 +409,7 @@ mod test {
             bincode::deserialize(include_bytes!("../../../test_data/small_proof.bin")).unwrap();
         let config = PcsConfig {
             pow_bits: 20,
-            fri_config: FriConfig::new(0, 5, 16),
+            fri_config: FriConfig::new(2, 5, 16),
         };
 
         let fiat_shamir_hints = FiatShamirHints::new(&proof, config, &[(1, QM31::one())]);
