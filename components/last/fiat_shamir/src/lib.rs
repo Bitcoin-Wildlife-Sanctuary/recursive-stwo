@@ -1,6 +1,6 @@
 use circle_plonk_dsl_channel::HashVar;
 use circle_plonk_dsl_circle::CirclePointQM31Var;
-use circle_plonk_dsl_constraint_system::dvar::{AllocVar, AllocationMode, DVar};
+use circle_plonk_dsl_constraint_system::var::{AllocVar, AllocationMode, Var};
 use circle_plonk_dsl_constraint_system::ConstraintSystemRef;
 use circle_plonk_dsl_data_structures::LookupElementsVar;
 use circle_plonk_dsl_fields::{M31Var, QM31Var};
@@ -84,7 +84,7 @@ pub struct LastFiatShamirInputVar {
     pub fri_alphas: Vec<QM31Var>,
 }
 
-impl DVar for LastFiatShamirInputVar {
+impl Var for LastFiatShamirInputVar {
     type Value = LastFiatShamirInput;
 
     fn cs(&self) -> ConstraintSystemRef {
@@ -195,7 +195,7 @@ impl LastFiatShamirResults {
 #[cfg(test)]
 mod test {
     use crate::{LastFiatShamirInput, LastFiatShamirInputVar, LastFiatShamirResults};
-    use circle_plonk_dsl_constraint_system::dvar::AllocVar;
+    use circle_plonk_dsl_constraint_system::var::AllocVar;
     use circle_plonk_dsl_constraint_system::ConstraintSystemRef;
     use circle_plonk_dsl_hints::FiatShamirHints;
     use circle_plonk_dsl_last_data_structures::LastPlonkWithPoseidonProofVar;

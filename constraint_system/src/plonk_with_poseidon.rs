@@ -1,4 +1,4 @@
-use crate::dvar::AllocationMode;
+use crate::var::AllocationMode;
 use crate::LOG_CONSTRAINT_SYSTEM_RESERVED_SIZE;
 use num_traits::{One, Zero};
 use std::cmp::max;

@@ -1,4 +1,4 @@
-use circle_plonk_dsl_constraint_system::dvar::{AllocVar, AllocationMode, DVar};
+use circle_plonk_dsl_constraint_system::var::{AllocVar, AllocationMode, Var};
 use circle_plonk_dsl_constraint_system::ConstraintSystemRef;
 use circle_plonk_dsl_fields::{M31Var, QM31Var};
 use itertools::Itertools;
@@ -13,7 +13,7 @@ pub struct LinePolyVar {
     pub coeffs: Vec<QM31Var>,
 }
 
-impl DVar for LinePolyVar {
+impl Var for LinePolyVar {
     type Value = LinePoly;
 
     fn cs(&self) -> ConstraintSystemRef {
@@ -70,7 +70,7 @@ impl LinePolyVar {
 #[cfg(test)]
 mod test {
     use crate::LinePolyVar;
-    use circle_plonk_dsl_constraint_system::dvar::AllocVar;
+    use circle_plonk_dsl_constraint_system::var::AllocVar;
     use circle_plonk_dsl_constraint_system::ConstraintSystemRef;
     use circle_plonk_dsl_fields::{M31Var, QM31Var};
     use rand::prelude::StdRng;

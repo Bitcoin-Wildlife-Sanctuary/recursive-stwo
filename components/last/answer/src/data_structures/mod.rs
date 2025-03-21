@@ -1,4 +1,4 @@
-use circle_plonk_dsl_constraint_system::dvar::{AllocVar, AllocationMode, DVar};
+use circle_plonk_dsl_constraint_system::var::{AllocVar, AllocationMode, Var};
 use circle_plonk_dsl_constraint_system::ConstraintSystemRef;
 use circle_plonk_dsl_hints::FiatShamirHints;
 use merkle_proofs::{
@@ -114,7 +114,7 @@ pub struct LastDecommitInputVar {
     pub composition_proofs: Vec<LastSinglePathMerkleProofInputVar>,
 }
 
-impl DVar for LastDecommitInputVar {
+impl Var for LastDecommitInputVar {
     type Value = LastDecommitInput;
 
     fn cs(&self) -> ConstraintSystemRef {

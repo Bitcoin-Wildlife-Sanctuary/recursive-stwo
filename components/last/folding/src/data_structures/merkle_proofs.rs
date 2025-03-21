@@ -1,4 +1,4 @@
-use circle_plonk_dsl_constraint_system::dvar::{AllocVar, AllocationMode, DVar};
+use circle_plonk_dsl_constraint_system::var::{AllocVar, AllocationMode, Var};
 use circle_plonk_dsl_constraint_system::ConstraintSystemRef;
 use circle_plonk_dsl_fields::QM31Var;
 use circle_plonk_dsl_hints::{AnswerHints, FiatShamirHints, FirstLayerHints};
@@ -126,7 +126,7 @@ pub struct LastSinglePairMerkleProofVar {
     pub siblings_columns: BTreeMap<usize, QM31Var>,
 }
 
-impl DVar for LastSinglePairMerkleProofVar {
+impl Var for LastSinglePairMerkleProofVar {
     type Value = LastSinglePairMerkleProof;
 
     fn cs(&self) -> ConstraintSystemRef {
@@ -265,7 +265,7 @@ pub struct LastFirstLayerInputVar {
     pub merkle_proofs: Vec<LastSinglePairMerkleProofVar>,
 }
 
-impl DVar for LastFirstLayerInputVar {
+impl Var for LastFirstLayerInputVar {
     type Value = LastFirstLayerHints;
 
     fn cs(&self) -> ConstraintSystemRef {
@@ -426,7 +426,7 @@ pub struct LastInnerLayersInputVar {
     pub merkle_proofs: BTreeMap<u32, Vec<LastSinglePairMerkleProofVar>>,
 }
 
-impl DVar for LastInnerLayersInputVar {
+impl Var for LastInnerLayersInputVar {
     type Value = LastInnerLayersHints;
 
     fn cs(&self) -> ConstraintSystemRef {

@@ -1,6 +1,6 @@
 use circle_plonk_dsl_bits::BitsVar;
 use circle_plonk_dsl_circle::CirclePointM31Var;
-use circle_plonk_dsl_constraint_system::dvar::{AllocVar, DVar};
+use circle_plonk_dsl_constraint_system::var::{AllocVar, Var};
 use circle_plonk_dsl_fields::M31Var;
 use itertools::Itertools;
 use num_traits::One;

@@ -1,5 +1,5 @@
 use crate::{CM31Var, M31Var};
-use circle_plonk_dsl_constraint_system::dvar::{AllocVar, AllocationMode, DVar};
+use circle_plonk_dsl_constraint_system::var::{AllocVar, AllocationMode, Var};
 use circle_plonk_dsl_constraint_system::ConstraintSystemRef;
 use num_traits::{One, Zero};
 use std::ops::{Add, Mul, Neg, Sub};
@@ -15,7 +15,7 @@ pub struct QM31Var {
     pub variable: usize,
 }
 
-impl DVar for QM31Var {
+impl Var for QM31Var {
     type Value = QM31;
 
     fn cs(&self) -> ConstraintSystemRef {
@@ -471,7 +471,7 @@ impl QM31Var {
 #[cfg(test)]
 mod test {
     use crate::QM31Var;
-    use circle_plonk_dsl_constraint_system::dvar::AllocVar;
+    use circle_plonk_dsl_constraint_system::var::AllocVar;
     use circle_plonk_dsl_constraint_system::ConstraintSystemRef;
     use num_traits::One;
     use rand::prelude::SmallRng;

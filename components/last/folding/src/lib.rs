@@ -198,7 +198,7 @@ mod test {
         LastFirstLayerHints, LastFirstLayerInputVar, LastInnerLayersHints, LastInnerLayersInputVar,
     };
     use crate::LastFoldingResults;
-    use circle_plonk_dsl_constraint_system::dvar::AllocVar;
+    use circle_plonk_dsl_constraint_system::var::AllocVar;
     use circle_plonk_dsl_constraint_system::ConstraintSystemRef;
     use circle_plonk_dsl_hints::{AnswerHints, FiatShamirHints};
     use circle_plonk_dsl_last_answer::data_structures::{

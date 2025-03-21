@@ -1,6 +1,6 @@
 use crate::emulated::poseidon_permute_emulated;
 use crate::implementation::poseidon2_permute;
-use circle_plonk_dsl_constraint_system::dvar::{AllocVar, AllocationMode, DVar};
+use circle_plonk_dsl_constraint_system::var::{AllocVar, AllocationMode, Var};
 use circle_plonk_dsl_constraint_system::{ConstraintSystemRef, ConstraintSystemType};
 use circle_plonk_dsl_fields::{M31Var, QM31Var};
 use num_traits::{One, Zero};
@@ -133,7 +133,7 @@ impl Poseidon2HalfVar {
     }
 }
 
-impl DVar for Poseidon2HalfVar {
+impl Var for Poseidon2HalfVar {
     type Value = [M31; 8];
 
     fn cs(&self) -> ConstraintSystemRef {

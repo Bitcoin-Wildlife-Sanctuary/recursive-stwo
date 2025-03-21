@@ -1,5 +1,5 @@
 use circle_plonk_dsl_circle::{CirclePointM31Var, CirclePointQM31Var};
-use circle_plonk_dsl_constraint_system::dvar::{AllocVar, DVar};
+use circle_plonk_dsl_constraint_system::var::{AllocVar, Var};
 use circle_plonk_dsl_fields::{CM31Var, M31Var, QM31Var};
 use indexmap::IndexMap;
 use itertools::{izip, zip_eq};

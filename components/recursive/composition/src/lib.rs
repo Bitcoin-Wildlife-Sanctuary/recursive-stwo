@@ -2,7 +2,7 @@ use crate::data_structures::{EvalAtRowVar, PointEvaluationAccumulatorVar};
 use crate::plonk::evaluate_plonk;
 use crate::poseidon::evaluate_poseidon;
 use circle_plonk_dsl_circle::CirclePointQM31Var;
-use circle_plonk_dsl_constraint_system::dvar::DVar;
+use circle_plonk_dsl_constraint_system::var::Var;
 use circle_plonk_dsl_data_structures::{LookupElementsVar, PlonkWithPoseidonProofVar};
 use circle_plonk_dsl_fields::{M31Var, QM31Var};
 use circle_plonk_dsl_hints::FiatShamirHints;
@@ -117,7 +117,7 @@ impl CompositionCheck {
 mod test {
     use crate::CompositionCheck;
     use circle_plonk_dsl_circle::CirclePointQM31Var;
-    use circle_plonk_dsl_constraint_system::dvar::AllocVar;
+    use circle_plonk_dsl_constraint_system::var::AllocVar;
     use circle_plonk_dsl_constraint_system::ConstraintSystemRef;
     use circle_plonk_dsl_data_structures::{LookupElementsVar, PlonkWithPoseidonProofVar};
     use circle_plonk_dsl_fields::QM31Var;

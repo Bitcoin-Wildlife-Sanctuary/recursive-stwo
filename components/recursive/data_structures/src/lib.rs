@@ -1,6 +1,6 @@
 use circle_plonk_dsl_bits::BitsVar;
 use circle_plonk_dsl_channel::{ChannelVar, HashVar};
-use circle_plonk_dsl_constraint_system::dvar::{AllocVar, AllocationMode, DVar};
+use circle_plonk_dsl_constraint_system::var::{AllocVar, AllocationMode, Var};
 use circle_plonk_dsl_constraint_system::ConstraintSystemRef;
 use circle_plonk_dsl_fields::{M31Var, QM31Var};
 use circle_plonk_dsl_hints::{DecommitHints, SinglePairMerkleProof, SinglePathMerkleProof};
@@ -24,7 +24,7 @@ pub struct PlonkWithPoseidonStatement0Var {
     pub log_size_poseidon: M31Var,
 }
 
-impl DVar for PlonkWithPoseidonStatement0Var {
+impl Var for PlonkWithPoseidonStatement0Var {
     type Value = PlonkWithPoseidonStatement0;
 
     fn cs(&self) -> ConstraintSystemRef {
@@ -61,7 +61,7 @@ pub struct PlonkWithPoseidonStatement1Var {
     pub poseidon_total_sum: QM31Var,
 }
 
-impl DVar for PlonkWithPoseidonStatement1Var {
+impl Var for PlonkWithPoseidonStatement1Var {
     type Value = PlonkWithPoseidonStatement1;
 
     fn cs(&self) -> ConstraintSystemRef {
@@ -94,7 +94,7 @@ pub struct PlonkWithPoseidonProofVar {
     pub stark_proof: StarkProofVar,
 }
 
-impl DVar for PlonkWithPoseidonProofVar {
+impl Var for PlonkWithPoseidonProofVar {
     type Value = PlonkWithPoseidonProof<Poseidon31MerkleHasher>;
 
     fn cs(&self) -> ConstraintSystemRef {
@@ -127,7 +127,7 @@ pub struct FriProofVar {
     pub last_poly: LinePolyVar,
 }
 
-impl DVar for FriProofVar {
+impl Var for FriProofVar {
     type Value = FriProof<Poseidon31MerkleHasher>;
 
     fn cs(&self) -> ConstraintSystemRef {
@@ -164,7 +164,7 @@ pub struct StarkProofVar {
     pub proof_of_work: [M31Var; 3],
 }
 
-impl DVar for StarkProofVar {
+impl Var for StarkProofVar {
     type Value = StarkProof<Poseidon31MerkleHasher>;
 
     fn cs(&self) -> ConstraintSystemRef {
@@ -230,7 +230,7 @@ pub struct LookupElementsVar {
     pub alpha_powers: [QM31Var; 3],
 }
 
-impl DVar for LookupElementsVar {
+impl Var for LookupElementsVar {
     type Value = PlonkWithAcceleratorLookupElements;
 
     fn cs(&self) -> ConstraintSystemRef {
@@ -276,7 +276,7 @@ pub struct SinglePathMerkleProofVar {
     pub columns: BTreeMap<usize, Vec<M31Var>>,
 }
 
-impl DVar for SinglePathMerkleProofVar {
+impl Var for SinglePathMerkleProofVar {
     type Value = SinglePathMerkleProof;
 
     fn cs(&self) -> ConstraintSystemRef {
@@ -363,7 +363,7 @@ pub struct SinglePairMerkleProofVar {
     pub siblings_columns: BTreeMap<usize, QM31Var>,
 }
 
-impl DVar for SinglePairMerkleProofVar {
+impl Var for SinglePairMerkleProofVar {
     type Value = SinglePairMerkleProof;
 
     fn cs(&self) -> ConstraintSystemRef {
@@ -473,7 +473,7 @@ pub struct DecommitmentVar {
     pub composition_proofs: Vec<SinglePathMerkleProofVar>,
 }
 
-impl DVar for DecommitmentVar {
+impl Var for DecommitmentVar {
     type Value = DecommitHints;
 
     fn cs(&self) -> ConstraintSystemRef {
@@ -518,7 +518,7 @@ mod test {
     use crate::{SinglePairMerkleProofVar, SinglePathMerkleProofVar};
     use circle_plonk_dsl_bits::BitsVar;
     use circle_plonk_dsl_channel::HashVar;
-    use circle_plonk_dsl_constraint_system::dvar::AllocVar;
+    use circle_plonk_dsl_constraint_system::var::AllocVar;
     use circle_plonk_dsl_constraint_system::ConstraintSystemRef;
     use circle_plonk_dsl_fields::M31Var;
     use circle_plonk_dsl_hints::{

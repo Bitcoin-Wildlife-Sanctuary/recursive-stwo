@@ -1,4 +1,4 @@
-use crate::dvar::AllocationMode;
+use crate::var::AllocationMode;
 use plonk_with_poseidon::PlonkWithPoseidonConstraintSystem;
 use plonk_without_poseidon::PlonkWithoutPoseidonConstraintSystem;
 use std::cell::RefCell;
@@ -12,7 +12,7 @@ use stwo_prover::examples::plonk_with_poseidon::poseidon::{
 };
 use stwo_prover::examples::plonk_without_poseidon::plonk::PlonkWithoutAcceleratorCircuitTrace;
 
-pub mod dvar;
+pub mod var;
 
 pub mod plonk_with_poseidon;
 pub mod plonk_without_poseidon;

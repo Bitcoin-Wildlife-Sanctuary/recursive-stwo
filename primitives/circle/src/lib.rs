@@ -1,6 +1,6 @@
 use circle_plonk_dsl_bits::BitsVar;
 use circle_plonk_dsl_channel::ChannelVar;
-use circle_plonk_dsl_constraint_system::dvar::{AllocVar, AllocationMode, DVar};
+use circle_plonk_dsl_constraint_system::var::{AllocVar, AllocationMode, Var};
 use circle_plonk_dsl_constraint_system::ConstraintSystemRef;
 use circle_plonk_dsl_fields::{M31Var, QM31Var};
 use itertools::Itertools;
@@ -25,7 +25,7 @@ impl CirclePointM31Var {
     }
 }
 
-impl DVar for CirclePointM31Var {
+impl Var for CirclePointM31Var {
     type Value = CirclePoint<BaseField>;
 
     fn cs(&self) -> ConstraintSystemRef {
@@ -184,7 +184,7 @@ impl CirclePointQM31Var {
     }
 }
 
-impl DVar for CirclePointQM31Var {
+impl Var for CirclePointQM31Var {
     type Value = CirclePoint<SecureField>;
 
     fn cs(&self) -> ConstraintSystemRef {
@@ -244,7 +244,7 @@ impl Add<&CirclePoint<M31>> for &CirclePointQM31Var {
 mod test {
     use crate::CirclePointM31Var;
     use circle_plonk_dsl_bits::BitsVar;
-    use circle_plonk_dsl_constraint_system::dvar::AllocVar;
+    use circle_plonk_dsl_constraint_system::var::AllocVar;
     use circle_plonk_dsl_constraint_system::ConstraintSystemRef;
     use circle_plonk_dsl_fields::M31Var;
     use stwo_prover::core::fields::m31::M31;

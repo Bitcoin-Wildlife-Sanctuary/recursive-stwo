@@ -2,7 +2,7 @@ use crate::data_structures::{LastDecommitHints, LastDecommitInputVar, LastDecomm
 use circle_plonk_dsl_answer::data_structures::{PointSampleVar, ShiftIndex};
 use circle_plonk_dsl_answer::AnswerResults;
 use circle_plonk_dsl_circle::{CirclePointM31Var, CirclePointQM31Var};
-use circle_plonk_dsl_constraint_system::dvar::DVar;
+use circle_plonk_dsl_constraint_system::var::Var;
 use circle_plonk_dsl_constraint_system::ConstraintSystemRef;
 use circle_plonk_dsl_fields::QM31Var;
 use circle_plonk_dsl_hints::{AnswerHints, FiatShamirHints};
@@ -314,7 +314,7 @@ impl LastAnswerResults {
 mod test {
     use crate::data_structures::{LastDecommitHints, LastDecommitInput, LastDecommitInputVar};
     use crate::LastAnswerResults;
-    use circle_plonk_dsl_constraint_system::dvar::AllocVar;
+    use circle_plonk_dsl_constraint_system::var::AllocVar;
     use circle_plonk_dsl_constraint_system::ConstraintSystemRef;
     use circle_plonk_dsl_hints::{AnswerHints, FiatShamirHints};
     use circle_plonk_dsl_last_data_structures::LastPlonkWithPoseidonProofVar;

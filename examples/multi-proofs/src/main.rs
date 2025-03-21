@@ -1,7 +1,7 @@
 use circle_plonk_dsl_answer::AnswerResults;
 use circle_plonk_dsl_circle::CirclePointQM31Var;
 use circle_plonk_dsl_composition::CompositionCheck;
-use circle_plonk_dsl_constraint_system::dvar::AllocVar;
+use circle_plonk_dsl_constraint_system::var::AllocVar;
 use circle_plonk_dsl_constraint_system::ConstraintSystemRef;
 use circle_plonk_dsl_data_structures::PlonkWithPoseidonProofVar;
 use circle_plonk_dsl_fiat_shamir::FiatShamirResults;

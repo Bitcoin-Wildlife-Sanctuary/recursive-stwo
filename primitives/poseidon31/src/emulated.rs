@@ -2,7 +2,7 @@ use crate::parameters::{
     FIRST_FOUR_ROUND_RC, LAST_FOUR_ROUNDS_RC, MAT_DIAG16_M_1, PARTIAL_ROUNDS_RC,
 };
 use crate::{IsSwap, Poseidon2HalfEmulatedVar};
-use circle_plonk_dsl_constraint_system::dvar::{AllocVar, DVar};
+use circle_plonk_dsl_constraint_system::var::{AllocVar, Var};
 use circle_plonk_dsl_constraint_system::ConstraintSystemRef;
 use circle_plonk_dsl_fields::{M31Var, QM31Var};
 use num_traits::{One, Zero};

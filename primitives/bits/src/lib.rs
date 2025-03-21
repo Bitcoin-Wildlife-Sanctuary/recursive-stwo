@@ -1,4 +1,4 @@
-use circle_plonk_dsl_constraint_system::dvar::{AllocVar, AllocationMode, DVar};
+use circle_plonk_dsl_constraint_system::var::{AllocVar, AllocationMode, Var};
 use circle_plonk_dsl_constraint_system::ConstraintSystemRef;
 use circle_plonk_dsl_fields::M31Var;
 use num_traits::{One, Zero};
@@ -13,7 +13,7 @@ pub struct BitsVar {
     pub variables: Vec<usize>,
 }
 
-impl DVar for BitsVar {
+impl Var for BitsVar {
     type Value = Vec<bool>;
 
     fn cs(&self) -> ConstraintSystemRef {

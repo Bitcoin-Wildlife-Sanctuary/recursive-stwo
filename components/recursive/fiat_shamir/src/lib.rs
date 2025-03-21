@@ -1,7 +1,7 @@
 use circle_plonk_dsl_bits::BitsVar;
 use circle_plonk_dsl_channel::{ChannelVar, HashVar};
 use circle_plonk_dsl_circle::CirclePointQM31Var;
-use circle_plonk_dsl_constraint_system::dvar::{AllocVar, DVar};
+use circle_plonk_dsl_constraint_system::var::{AllocVar, Var};
 use circle_plonk_dsl_data_structures::{LookupElementsVar, PlonkWithPoseidonProofVar};
 use circle_plonk_dsl_fields::{M31Var, QM31Var};
 use circle_plonk_dsl_hints::FiatShamirHints;
@@ -179,7 +179,7 @@ impl FiatShamirResults {
 #[cfg(test)]
 mod test {
     use crate::FiatShamirResults;
-    use circle_plonk_dsl_constraint_system::dvar::AllocVar;
+    use circle_plonk_dsl_constraint_system::var::AllocVar;
     use circle_plonk_dsl_constraint_system::ConstraintSystemRef;
     use circle_plonk_dsl_data_structures::PlonkWithPoseidonProofVar;
     use circle_plonk_dsl_fields::QM31Var;

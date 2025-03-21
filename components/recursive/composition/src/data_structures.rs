@@ -1,4 +1,4 @@
-use circle_plonk_dsl_constraint_system::dvar::DVar;
+use circle_plonk_dsl_constraint_system::var::Var;
 use circle_plonk_dsl_data_structures::LookupElementsVar;
 use circle_plonk_dsl_fields::QM31Var;
 use stwo_prover::constraint_framework::preprocessed_columns::PreProcessedColumnId;

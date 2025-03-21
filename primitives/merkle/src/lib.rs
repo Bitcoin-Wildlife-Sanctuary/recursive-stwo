@@ -1,4 +1,4 @@
-use circle_plonk_dsl_constraint_system::dvar::DVar;
+use circle_plonk_dsl_constraint_system::var::Var;
 use circle_plonk_dsl_fields::{M31Var, QM31Var};
 use circle_plonk_dsl_poseidon31::Poseidon2HalfVar;
 use std::cmp::min;
@@ -219,7 +219,7 @@ impl Poseidon31MerkleHasherVar {
 #[cfg(test)]
 mod test {
     use crate::Poseidon31MerkleHasherVar;
-    use circle_plonk_dsl_constraint_system::dvar::AllocVar;
+    use circle_plonk_dsl_constraint_system::var::AllocVar;
     use circle_plonk_dsl_constraint_system::ConstraintSystemRef;
     use circle_plonk_dsl_fields::M31Var;
     use circle_plonk_dsl_poseidon31::Poseidon2HalfVar;

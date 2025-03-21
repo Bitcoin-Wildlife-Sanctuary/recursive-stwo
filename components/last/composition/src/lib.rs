@@ -99,7 +99,7 @@ impl LastCompositionCheck {
 #[cfg(test)]
 mod test {
     use crate::LastCompositionCheck;
-    use circle_plonk_dsl_constraint_system::dvar::AllocVar;
+    use circle_plonk_dsl_constraint_system::var::AllocVar;
     use circle_plonk_dsl_constraint_system::ConstraintSystemRef;
     use circle_plonk_dsl_hints::FiatShamirHints;
     use circle_plonk_dsl_last_data_structures::LastPlonkWithPoseidonProofVar;

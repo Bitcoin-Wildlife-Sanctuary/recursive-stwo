@@ -1,4 +1,4 @@
-use circle_plonk_dsl_constraint_system::dvar::{AllocVar, DVar};
+use circle_plonk_dsl_constraint_system::var::{AllocVar, Var};
 use circle_plonk_dsl_constraint_system::ConstraintSystemRef;
 use circle_plonk_dsl_fields::{M31Var, QM31Var};
 use circle_plonk_dsl_poseidon31::Poseidon2HalfVar;
@@ -12,7 +12,7 @@ pub struct ChannelVar {
     pub digest: Poseidon2HalfVar,
 }
 
-impl DVar for ChannelVar {
+impl Var for ChannelVar {
     type Value = [M31; 16];
 
     fn cs(&self) -> ConstraintSystemRef {

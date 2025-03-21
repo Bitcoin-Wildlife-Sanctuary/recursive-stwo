@@ -1,5 +1,5 @@
 use crate::M31Var;
-use circle_plonk_dsl_constraint_system::dvar::{AllocVar, AllocationMode, DVar};
+use circle_plonk_dsl_constraint_system::var::{AllocVar, AllocationMode, Var};
 use circle_plonk_dsl_constraint_system::ConstraintSystemRef;
 use num_traits::{One, Zero};
 use std::ops::{Add, Mul, Neg, Sub};
@@ -14,7 +14,7 @@ pub struct CM31Var {
     pub variable: usize,
 }
 
-impl DVar for CM31Var {
+impl Var for CM31Var {
     type Value = CM31;
 
     fn cs(&self) -> ConstraintSystemRef {

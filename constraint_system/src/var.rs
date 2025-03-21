@@ -1,6 +1,6 @@
 use crate::ConstraintSystemRef;
 
-pub trait DVar: Clone {
+pub trait Var: Clone {
     /// The type of the "native" value that `Self` represents in the constraint
     /// system.
     type Value: Clone;
@@ -16,7 +16,7 @@ pub enum AllocationMode {
     Constant,
 }
 
-pub trait AllocVar: DVar {
+pub trait AllocVar: Var {
     fn new_variables(cs: &ConstraintSystemRef, value: &Self::Value, mode: AllocationMode) -> Self;
 
     fn new_constant(cs: &ConstraintSystemRef, value: &Self::Value) -> Self {

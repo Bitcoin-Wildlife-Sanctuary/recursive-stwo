@@ -1,4 +1,4 @@
-use circle_plonk_dsl_constraint_system::dvar::{AllocVar, AllocationMode, DVar};
+use circle_plonk_dsl_constraint_system::var::{AllocVar, AllocationMode, Var};
 use circle_plonk_dsl_constraint_system::ConstraintSystemRef;
 use circle_plonk_dsl_data_structures::{
     PlonkWithPoseidonStatement0Var, PlonkWithPoseidonStatement1Var,
@@ -18,7 +18,7 @@ pub struct LastPlonkWithPoseidonProofVar {
     pub stark_proof: LastStarkProofVar,
 }
 
-impl DVar for LastPlonkWithPoseidonProofVar {
+impl Var for LastPlonkWithPoseidonProofVar {
     type Value = PlonkWithPoseidonProof<Sha256Poseidon31MerkleHasher>;
 
     fn cs(&self) -> ConstraintSystemRef {
@@ -50,7 +50,7 @@ pub struct LastStarkProofVar {
     pub last_poly: LinePolyVar,
 }
 
-impl DVar for LastStarkProofVar {
+impl Var for LastStarkProofVar {
     type Value = StarkProof<Sha256Poseidon31MerkleHasher>;
 
     fn cs(&self) -> ConstraintSystemRef {

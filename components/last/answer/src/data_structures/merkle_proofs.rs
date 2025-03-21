@@ -1,4 +1,4 @@
-use circle_plonk_dsl_constraint_system::dvar::{AllocVar, AllocationMode, DVar};
+use circle_plonk_dsl_constraint_system::var::{AllocVar, AllocationMode, Var};
 use circle_plonk_dsl_constraint_system::ConstraintSystemRef;
 use circle_plonk_dsl_fields::{M31Var, QM31Var};
 use circle_plonk_dsl_merkle::Poseidon31MerkleHasherVar;
@@ -206,7 +206,7 @@ pub struct LastSinglePathMerkleProofInputVar {
     pub packed_columns: BTreeMap<usize, Vec<QM31Var>>,
 }
 
-impl DVar for LastSinglePathMerkleProofInputVar {
+impl Var for LastSinglePathMerkleProofInputVar {
     type Value = LastSinglePathMerkleProofInput;
 
     fn cs(&self) -> ConstraintSystemRef {
