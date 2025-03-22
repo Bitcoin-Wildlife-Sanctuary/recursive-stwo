@@ -32,7 +32,7 @@ impl ChannelVar {
         self.n_sent = 0;
     }
 
-    pub fn get_felts(&mut self) -> [QM31Var; 2] {
+    pub fn draw_felts(&mut self) -> [QM31Var; 2] {
         let cs = self.cs();
 
         let n_sent = M31Var::new_constant(&cs, &M31::from(self.n_sent as u32));
@@ -44,14 +44,14 @@ impl ChannelVar {
         Poseidon2HalfVar::permute_get_rate(&left, &self.digest).to_qm31()
     }
 
-    pub fn absorb_one_felt_and_permute(&mut self, felt: &QM31Var) {
+    pub fn mix_one_felt(&mut self, felt: &QM31Var) {
         let cs = self.cs();
         let left = Poseidon2HalfVar::from_qm31(&felt, &QM31Var::zero(&cs));
         self.digest = Poseidon2HalfVar::permute_get_capacity(&left, &self.digest);
         self.n_sent = 0;
     }
 
-    pub fn absorb_two_felts_and_permute(&mut self, felt1: &QM31Var, felt2: &QM31Var) {
+    pub fn mix_two_felts(&mut self, felt1: &QM31Var, felt2: &QM31Var) {
         let left = Poseidon2HalfVar::from_qm31(&felt1, &felt2);
         self.digest = Poseidon2HalfVar::permute_get_capacity(&left, &self.digest);
         self.n_sent = 0;

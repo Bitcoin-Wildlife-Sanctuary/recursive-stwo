@@ -50,8 +50,8 @@ impl AllocVar for PlonkWithPoseidonStatement0Var {
 
 impl PlonkWithPoseidonStatement0Var {
     pub fn mix_into(&self, channel: &mut ChannelVar) {
-        channel.absorb_one_felt_and_permute(&QM31Var::from(&self.log_size_plonk));
-        channel.absorb_one_felt_and_permute(&QM31Var::from(&self.log_size_poseidon))
+        channel.mix_one_felt(&QM31Var::from(&self.log_size_plonk));
+        channel.mix_one_felt(&QM31Var::from(&self.log_size_poseidon))
     }
 }
 
@@ -83,7 +83,7 @@ impl AllocVar for PlonkWithPoseidonStatement1Var {
 
 impl PlonkWithPoseidonStatement1Var {
     pub fn mix_into(&self, channel: &mut ChannelVar) {
-        channel.absorb_two_felts_and_permute(&self.plonk_total_sum, &self.poseidon_total_sum);
+        channel.mix_two_felts(&self.plonk_total_sum, &self.poseidon_total_sum);
     }
 }
 
@@ -240,7 +240,7 @@ impl Var for LookupElementsVar {
 
 impl LookupElementsVar {
     pub fn draw(channel: &mut ChannelVar) -> Self {
-        let [z, alpha] = channel.get_felts();
+        let [z, alpha] = channel.draw_felts();
         Self::from_z_and_alpha(z, alpha)
     }
 

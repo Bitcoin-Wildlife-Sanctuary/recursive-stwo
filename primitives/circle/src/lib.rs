@@ -219,7 +219,7 @@ impl CirclePointQM31Var {
     }
 
     pub fn from_channel(channel: &mut ChannelVar) -> Self {
-        let [t, _] = channel.get_felts();
+        let [t, _] = channel.draw_felts();
         Self::from_t(&t)
     }
 }

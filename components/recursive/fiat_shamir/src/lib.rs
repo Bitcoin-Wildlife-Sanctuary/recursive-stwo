@@ -57,7 +57,7 @@ impl FiatShamirResults {
         proof.stmt1.mix_into(&mut channel);
         channel.mix_root(&mut interaction_trace_commitment);
 
-        let random_coeff = channel.get_felts()[0].clone();
+        let random_coeff = channel.draw_felts()[0].clone();
 
         // Read composition polynomial commitment.
         channel.mix_root(&mut composition_commitment);
@@ -68,18 +68,18 @@ impl FiatShamirResults {
         let sampled_values_flattened = proof.stark_proof.sampled_values.clone().flatten_cols();
         for chunk in sampled_values_flattened.chunks(2) {
             if chunk.len() == 1 {
-                channel.absorb_one_felt_and_permute(&chunk[0]);
+                channel.mix_one_felt(&chunk[0]);
             } else {
-                channel.absorb_two_felts_and_permute(&chunk[0], &chunk[1]);
+                channel.mix_two_felts(&chunk[0], &chunk[1]);
             }
         }
 
-        let after_sampled_values_random_coeff = channel.get_felts()[0].clone();
+        let after_sampled_values_random_coeff = channel.draw_felts()[0].clone();
 
         // FRI layers commitments and alphas
         let mut fri_alphas = vec![];
         channel.mix_root(&mut proof.stark_proof.fri_proof.first_layer_commitment);
-        fri_alphas.push(channel.get_felts()[0].clone());
+        fri_alphas.push(channel.draw_felts()[0].clone());
 
         for l in proof
             .stark_proof
@@ -88,14 +88,14 @@ impl FiatShamirResults {
             .iter_mut()
         {
             channel.mix_root(l);
-            fri_alphas.push(channel.get_felts()[0].clone());
+            fri_alphas.push(channel.draw_felts()[0].clone());
         }
 
         for chunk in proof.stark_proof.fri_proof.last_poly.coeffs.chunks(2) {
             if chunk.len() == 1 {
-                channel.absorb_one_felt_and_permute(&chunk[0]);
+                channel.mix_one_felt(&chunk[0]);
             } else {
-                channel.absorb_two_felts_and_permute(&chunk[0], &chunk[1]);
+                channel.mix_two_felts(&chunk[0], &chunk[1]);
             }
         }
 
@@ -110,7 +110,7 @@ impl FiatShamirResults {
         let _ = BitsVar::from_m31(&proof.stark_proof.proof_of_work[1], 21);
         let _ = BitsVar::from_m31(&proof.stark_proof.proof_of_work[2], 21);
 
-        channel.absorb_one_felt_and_permute(&nonce_felt);
+        channel.mix_one_felt(&nonce_felt);
 
         let lower_bits = BitsVar::from_m31(&channel.digest.to_qm31()[0].decompose_m31()[0], 31)
             .compose_range(0..pcs_config.pow_bits as usize);
@@ -120,7 +120,7 @@ impl FiatShamirResults {
         let mut draw_queries_felts =
             Vec::with_capacity(pcs_config.fri_config.n_queries.div_ceil(4));
         for _ in 0..pcs_config.fri_config.n_queries.div_ceil(4) {
-            let [a, b] = channel.get_felts();
+            let [a, b] = channel.draw_felts();
             draw_queries_felts.push(a);
             draw_queries_felts.push(b);
         }
