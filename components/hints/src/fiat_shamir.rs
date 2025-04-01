@@ -22,6 +22,9 @@ use stwo_prover::examples::plonk_with_poseidon::plonk::PlonkWithAcceleratorLooku
 pub struct FiatShamirHints<MC: MerkleChannel> {
     pub preprocessed_commitment: <MC::H as MerkleHasher>::Hash,
     pub trace_commitment: <MC::H as MerkleHasher>::Hash,
+    pub interaction_commitment: <MC::H as MerkleHasher>::Hash,
+    pub composition_commitment: <MC::H as MerkleHasher>::Hash,
+
     pub log_size_plonk: u32,
     pub log_size_poseidon: u32,
     pub plonk_total_sum: SecureField,
@@ -256,6 +259,9 @@ impl<MC: MerkleChannel> FiatShamirHints<MC> {
         FiatShamirHints {
             preprocessed_commitment: proof.stark_proof.commitments[0],
             trace_commitment: proof.stark_proof.commitments[1],
+            interaction_commitment: proof.stark_proof.commitments[2],
+            composition_commitment: proof.stark_proof.commitments[3],
+
             log_size_plonk: proof.stmt0.log_size_plonk,
             log_size_poseidon: proof.stmt0.log_size_poseidon,
             plonk_total_sum: proof.stmt1.plonk_total_sum,
