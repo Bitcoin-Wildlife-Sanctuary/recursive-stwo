@@ -177,10 +177,28 @@ impl LastFiatShamirResults {
         }
         queries_at_max_first_layer_column_log_size.truncate(last_fiat_shamir_input_var.queries_len);
 
+        // enforce the total sum
+        let cs = oods_point.cs();
+        let mut input_sum = QM31Var::zero(&cs);
+
+        let sum = &(&QM31Var::one(&cs) + &lookup_elements.alpha) - &lookup_elements.z;
+        input_sum = &input_sum + &sum.inv();
+        let alpha_two = &lookup_elements.alpha + &lookup_elements.alpha;
+        let sum = &(&QM31Var::i(&cs) + &alpha_two) - &lookup_elements.z;
+        input_sum = &input_sum + &sum.inv();
+        let alpha_three = &alpha_two + &lookup_elements.alpha;
+        let sum = &(&QM31Var::j(&cs) + &alpha_three) - &lookup_elements.z;
+        input_sum = &input_sum + &sum.inv();
+
+        let plonk_total_sum = last_fiat_shamir_input_var.plonk_total_sum.clone();
+        let poseidon_total_sum = last_fiat_shamir_input_var.poseidon_total_sum.clone();
+
+        (&(&input_sum + &poseidon_total_sum) + &plonk_total_sum).equalverify(&QM31Var::zero(&cs));
+
         LastFiatShamirResults {
             oods_point,
-            plonk_total_sum: last_fiat_shamir_input_var.plonk_total_sum.clone(),
-            poseidon_total_sum: last_fiat_shamir_input_var.poseidon_total_sum.clone(),
+            plonk_total_sum,
+            poseidon_total_sum,
             lookup_elements,
             random_coeff: last_fiat_shamir_input_var.random_coeff.clone(),
             after_sampled_values_random_coeff: last_fiat_shamir_input_var
