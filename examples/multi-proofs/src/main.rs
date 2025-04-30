@@ -198,6 +198,21 @@ fn main() {
     demo_recurse::<Poseidon31MerkleChannel>(
         Path::new("../../components/test_data/recursive_proof_16_15.bin"),
         standard_config,
+        1,
+        Path::new("data/level1-fast.bin"),
+        fast_prover_config,
+    );
+    demo_recurse::<Poseidon31MerkleChannel>(
+        Path::new("data/level1-fast.bin"),
+        fast_prover_config,
+        5,
+        Path::new("data/level3-fast.bin"),
+        fast_prover_config,
+    );
+
+    demo_recurse::<Poseidon31MerkleChannel>(
+        Path::new("../../components/test_data/recursive_proof_16_15.bin"),
+        standard_config,
         5,
         Path::new("data/level1-5.bin"),
         fast_prover_config,
