@@ -263,6 +263,13 @@ impl ConstraintSystemRef {
         }
     }
 
+    pub fn num_poseidon_invocations(&self) -> usize {
+        match self.0.borrow_mut().deref_mut() {
+            ConstraintSystemEnum::PlonkWithPoseidon(cs) => cs.flow.0.len(),
+            ConstraintSystemEnum::PlonkWithoutPoseidon(_) => unimplemented!(),
+        }
+    }
+
     pub fn assemble_poseidon_gate(&self, a_wire: usize, b_wire: usize) -> usize {
         match self.0.borrow_mut().deref_mut() {
             ConstraintSystemEnum::PlonkWithPoseidon(cs) => {

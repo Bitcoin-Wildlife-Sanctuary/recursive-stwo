@@ -69,7 +69,11 @@ pub fn demo_recurse<C: MerkleChannel>(
     for _ in 0..multipliers {
         let mut proof_var = PlonkWithPoseidonProofVar::new_witness(&cs, &proof);
 
-        println!("-> after allocating the proof: {}", cs.num_plonk_rows());
+        println!(
+            "-> after allocating the proof: {}, {}",
+            cs.num_plonk_rows(),
+            cs.num_poseidon_invocations()
+        );
 
         let fiat_shamir_results = FiatShamirResults::compute(
             &fiat_shamir_hints,
@@ -82,7 +86,11 @@ pub fn demo_recurse<C: MerkleChannel>(
             ],
         );
 
-        println!("-> after fiat-shamir: {}", cs.num_plonk_rows());
+        println!(
+            "-> after fiat-shamir: {} {}",
+            cs.num_plonk_rows(),
+            cs.num_poseidon_invocations()
+        );
 
         CompositionCheck::compute(
             &fiat_shamir_hints,
@@ -92,7 +100,11 @@ pub fn demo_recurse<C: MerkleChannel>(
             &proof_var,
         );
 
-        println!("-> after composition: {}", cs.num_plonk_rows());
+        println!(
+            "-> after composition: {} {}",
+            cs.num_plonk_rows(),
+            cs.num_poseidon_invocations()
+        );
 
         let answer_results = AnswerResults::compute(
             &CirclePointQM31Var::new_witness(&cs, &fiat_shamir_hints.oods_point),
@@ -104,7 +116,11 @@ pub fn demo_recurse<C: MerkleChannel>(
             src_config,
         );
 
-        println!("-> after answer: {}", cs.num_plonk_rows());
+        println!(
+            "-> after answer: {} {}",
+            cs.num_plonk_rows(),
+            cs.num_poseidon_invocations()
+        );
 
         FoldingResults::compute(
             &proof_var,
@@ -115,7 +131,11 @@ pub fn demo_recurse<C: MerkleChannel>(
             &inner_layer_hints,
         );
 
-        println!("-> after folding: {}", cs.num_plonk_rows());
+        println!(
+            "-> after folding: {} {}",
+            cs.num_plonk_rows(),
+            cs.num_poseidon_invocations()
+        );
     }
 
     cs.pad();
