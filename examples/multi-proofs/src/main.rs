@@ -23,7 +23,7 @@ use stwo_prover::core::pcs::PcsConfig;
 use stwo_prover::core::vcs::poseidon31_merkle::{Poseidon31MerkleChannel, Poseidon31MerkleHasher};
 use stwo_prover::core::vcs::sha256_poseidon31_merkle::Sha256Poseidon31MerkleChannel;
 use stwo_prover::examples::plonk_with_poseidon::air::{
-    prove_plonk_with_poseidon, verify_plonk_with_poseidon, PlonkWithPoseidonProof,
+    prove_plonk_with_poseidon_unchecked, verify_plonk_with_poseidon, PlonkWithPoseidonProof,
 };
 
 pub fn demo_recurse<C: MerkleChannel>(
@@ -150,7 +150,7 @@ pub fn demo_recurse<C: MerkleChannel>(
     }
 
     let timer = std::time::Instant::now();
-    let proof = prove_plonk_with_poseidon::<C>(dest_config, &plonk, &mut poseidon);
+    let proof = prove_plonk_with_poseidon_unchecked::<C>(dest_config, &plonk, &mut poseidon);
     println!("proof generation time: {}s", timer.elapsed().as_secs_f64());
 
     let encoded = bincode::serialize(&proof).unwrap();
