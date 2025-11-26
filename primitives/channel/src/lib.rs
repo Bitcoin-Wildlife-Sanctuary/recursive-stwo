@@ -2,7 +2,7 @@ use circle_plonk_dsl_constraint_system::var::{AllocVar, Var};
 use circle_plonk_dsl_constraint_system::ConstraintSystemRef;
 use circle_plonk_dsl_fields::{M31Var, QM31Var};
 use circle_plonk_dsl_poseidon31::Poseidon2HalfVar;
-use stwo_prover::core::fields::m31::M31;
+use stwo::core::fields::m31::M31;
 
 pub type HashVar = Poseidon2HalfVar;
 

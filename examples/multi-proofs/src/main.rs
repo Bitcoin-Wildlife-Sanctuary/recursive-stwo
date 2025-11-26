@@ -14,15 +14,15 @@ use num_traits::One;
 use serde::Serialize;
 use std::io::Write;
 use std::path::Path;
-use stwo_prover::core::backend::simd::SimdBackend;
-use stwo_prover::core::backend::BackendForChannel;
-use stwo_prover::core::channel::MerkleChannel;
-use stwo_prover::core::fields::qm31::QM31;
-use stwo_prover::core::fri::FriConfig;
-use stwo_prover::core::pcs::PcsConfig;
-use stwo_prover::core::vcs::poseidon31_merkle::{Poseidon31MerkleChannel, Poseidon31MerkleHasher};
-use stwo_prover::core::vcs::sha256_poseidon31_merkle::Sha256Poseidon31MerkleChannel;
-use stwo_prover::examples::plonk_with_poseidon::air::{
+use stwo::core::channel::MerkleChannel;
+use stwo::core::fields::qm31::QM31;
+use stwo::core::fri::FriConfig;
+use stwo::core::pcs::PcsConfig;
+use stwo::core::vcs::poseidon31_merkle::{Poseidon31MerkleChannel, Poseidon31MerkleHasher};
+use stwo::core::vcs::sha256_poseidon31_merkle::Sha256Poseidon31MerkleChannel;
+use stwo::prover::backend::simd::SimdBackend;
+use stwo::prover::backend::BackendForChannel;
+use stwo_examples::plonk_with_poseidon::air::{
     prove_plonk_with_poseidon_unchecked, verify_plonk_with_poseidon, PlonkWithPoseidonProof,
 };
 

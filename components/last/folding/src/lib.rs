@@ -7,7 +7,7 @@ use circle_plonk_dsl_last_answer::LastAnswerResults;
 use circle_plonk_dsl_last_data_structures::LastPlonkWithPoseidonProofVar;
 use circle_plonk_dsl_last_fiat_shamir::LastFiatShamirResults;
 use std::collections::{BTreeMap, HashMap};
-use stwo_prover::core::vcs::sha256_poseidon31_merkle::Sha256Poseidon31MerkleChannel;
+use stwo::core::vcs::sha256_poseidon31_merkle::Sha256Poseidon31MerkleChannel;
 
 pub mod data_structures;
 
@@ -210,17 +210,17 @@ mod test {
         LastFiatShamirInput, LastFiatShamirInputVar, LastFiatShamirResults,
     };
     use num_traits::One;
-    use stwo_prover::core::fields::qm31::QM31;
-    use stwo_prover::core::fri::FriConfig;
-    use stwo_prover::core::pcs::PcsConfig;
-    use stwo_prover::core::vcs::sha256_merkle::Sha256MerkleChannel;
-    use stwo_prover::core::vcs::sha256_poseidon31_merkle::{
+    use stwo::core::fields::qm31::QM31;
+    use stwo::core::fri::FriConfig;
+    use stwo::core::pcs::PcsConfig;
+    use stwo::core::vcs::sha256_merkle::Sha256MerkleChannel;
+    use stwo::core::vcs::sha256_poseidon31_merkle::{
         Sha256Poseidon31MerkleChannel, Sha256Poseidon31MerkleHasher,
     };
-    use stwo_prover::examples::plonk_with_poseidon::air::{
+    use stwo_examples::plonk_with_poseidon::air::{
         verify_plonk_with_poseidon, PlonkWithPoseidonProof,
     };
-    use stwo_prover::examples::plonk_without_poseidon::air::{
+    use stwo_examples::plonk_without_poseidon::air::{
         prove_plonk_without_poseidon, verify_plonk_without_poseidon,
     };
 

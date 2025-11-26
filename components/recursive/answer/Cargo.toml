@@ -4,7 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-stwo-prover.workspace = true
+stwo.workspace = true
+stwo-examples.workspace = true
+stwo-constraint-framework.workspace = true
 circle-plonk-dsl-fiat-shamir = { path = "../fiat_shamir" }
 circle-plonk-dsl-circle = { path = "../../../primitives/circle" }
 circle-plonk-dsl-hints = { path = "../../hints" }

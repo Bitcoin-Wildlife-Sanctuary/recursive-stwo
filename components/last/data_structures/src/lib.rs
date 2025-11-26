@@ -5,11 +5,11 @@ use circle_plonk_dsl_data_structures::{
 };
 use circle_plonk_dsl_fields::QM31Var;
 use circle_plonk_dsl_line::LinePolyVar;
-use stwo_prover::core::pcs::TreeVec;
-use stwo_prover::core::prover::StarkProof;
-use stwo_prover::core::vcs::sha256_poseidon31_merkle::Sha256Poseidon31MerkleHasher;
-use stwo_prover::core::ColumnVec;
-use stwo_prover::examples::plonk_with_poseidon::air::PlonkWithPoseidonProof;
+use stwo::core::pcs::TreeVec;
+use stwo::core::proof::StarkProof;
+use stwo::core::vcs::sha256_poseidon31_merkle::Sha256Poseidon31MerkleHasher;
+use stwo::core::ColumnVec;
+use stwo_examples::plonk_with_poseidon::air::PlonkWithPoseidonProof;
 
 #[derive(Debug, Clone)]
 pub struct LastPlonkWithPoseidonProofVar {

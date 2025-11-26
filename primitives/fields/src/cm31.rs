@@ -3,9 +3,9 @@ use circle_plonk_dsl_constraint_system::var::{AllocVar, AllocationMode, Var};
 use circle_plonk_dsl_constraint_system::ConstraintSystemRef;
 use num_traits::{One, Zero};
 use std::ops::{Add, Mul, Neg, Sub};
-use stwo_prover::core::fields::cm31::CM31;
-use stwo_prover::core::fields::m31::M31;
-use stwo_prover::core::fields::FieldExpOps;
+use stwo::core::fields::cm31::CM31;
+use stwo::core::fields::m31::M31;
+use stwo::core::fields::FieldExpOps;
 
 #[derive(Debug, Clone)]
 pub struct CM31Var {

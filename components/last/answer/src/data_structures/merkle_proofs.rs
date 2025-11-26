@@ -5,11 +5,11 @@ use circle_plonk_dsl_merkle::Poseidon31MerkleHasherVar;
 use itertools::Itertools;
 use num_traits::Zero;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
-use stwo_prover::core::fields::m31::{BaseField, M31};
-use stwo_prover::core::fields::qm31::QM31;
-use stwo_prover::core::vcs::poseidon31_merkle::Poseidon31MerkleHasher;
-use stwo_prover::core::vcs::prover::MerkleDecommitment;
-use stwo_prover::core::vcs::sha256_poseidon31_merkle::Sha256Poseidon31MerkleHasher;
+use stwo::core::fields::m31::{BaseField, M31};
+use stwo::core::fields::qm31::QM31;
+use stwo::core::vcs::poseidon31_merkle::Poseidon31MerkleHasher;
+use stwo::core::vcs::sha256_poseidon31_merkle::Sha256Poseidon31MerkleHasher;
+use stwo::core::vcs::verifier::MerkleDecommitment;
 
 #[derive(Clone, Debug)]
 pub struct LastSinglePathMerkleProof {

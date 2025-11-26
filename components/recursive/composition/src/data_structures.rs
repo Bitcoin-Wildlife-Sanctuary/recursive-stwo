@@ -1,14 +1,14 @@
 use circle_plonk_dsl_constraint_system::var::Var;
 use circle_plonk_dsl_data_structures::LookupElementsVar;
 use circle_plonk_dsl_fields::QM31Var;
-use stwo_prover::constraint_framework::preprocessed_columns::PreProcessedColumnId;
-use stwo_prover::constraint_framework::{
+use stwo::core::fields::m31::BaseField;
+use stwo::core::fields::qm31::SECURE_EXTENSION_DEGREE;
+use stwo::core::pcs::TreeVec;
+use stwo::core::ColumnVec;
+use stwo_constraint_framework::preprocessed_columns::PreProcessedColumnId;
+use stwo_constraint_framework::{
     INTERACTION_TRACE_IDX, ORIGINAL_TRACE_IDX, PREPROCESSED_TRACE_IDX,
 };
-use stwo_prover::core::fields::m31::BaseField;
-use stwo_prover::core::fields::secure_column::SECURE_EXTENSION_DEGREE;
-use stwo_prover::core::pcs::TreeVec;
-use stwo_prover::core::ColumnVec;
 
 pub struct PointEvaluationAccumulatorVar {
     pub random_coeff: QM31Var,

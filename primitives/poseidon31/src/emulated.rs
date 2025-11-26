@@ -6,8 +6,8 @@ use circle_plonk_dsl_constraint_system::var::{AllocVar, Var};
 use circle_plonk_dsl_constraint_system::ConstraintSystemRef;
 use circle_plonk_dsl_fields::{M31Var, QM31Var};
 use num_traits::{One, Zero};
-use stwo_prover::core::fields::m31::M31;
-use stwo_prover::core::fields::qm31::QM31;
+use stwo::core::fields::m31::M31;
+use stwo::core::fields::qm31::QM31;
 
 pub fn apply_4x4_mds_matrix(x: &QM31Var) -> QM31Var {
     let cs = x.cs();
@@ -225,10 +225,10 @@ mod tests {
     use super::*;
     use crate::Poseidon2HalfVar;
     use circle_plonk_dsl_constraint_system::ConstraintSystemRef;
-    use stwo_prover::core::fri::FriConfig;
-    use stwo_prover::core::pcs::PcsConfig;
-    use stwo_prover::core::vcs::poseidon31_merkle::Poseidon31MerkleChannel;
-    use stwo_prover::examples::plonk_without_poseidon::air::{
+    use stwo::core::fri::FriConfig;
+    use stwo::core::pcs::PcsConfig;
+    use stwo::core::vcs::poseidon31_merkle::Poseidon31MerkleChannel;
+    use stwo_examples::plonk_without_poseidon::air::{
         prove_plonk_without_poseidon, verify_plonk_without_poseidon,
     };
 

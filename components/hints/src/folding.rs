@@ -2,20 +2,20 @@ use crate::{AnswerHints, FiatShamirHints};
 use itertools::{zip_eq, Itertools};
 use num_traits::Zero;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
-use stwo_prover::core::circle::{CirclePoint, Coset};
-use stwo_prover::core::fields::m31::M31;
-use stwo_prover::core::fields::qm31::{SecureField, QM31};
-use stwo_prover::core::fields::secure_column::SECURE_EXTENSION_DEGREE;
-use stwo_prover::core::fields::{ExtensionOf, Field, FieldExpOps};
-use stwo_prover::core::fri::SparseEvaluation;
-use stwo_prover::core::utils::bit_reverse_index;
-use stwo_prover::core::vcs::ops::MerkleHasher;
-use stwo_prover::core::vcs::poseidon31_hash::Poseidon31Hash;
-use stwo_prover::core::vcs::poseidon31_merkle::{Poseidon31MerkleChannel, Poseidon31MerkleHasher};
-use stwo_prover::core::vcs::poseidon31_ref::Poseidon31CRH;
-use stwo_prover::core::vcs::prover::MerkleDecommitment;
-use stwo_prover::core::vcs::verifier::MerkleVerifier;
-use stwo_prover::examples::plonk_with_poseidon::air::PlonkWithPoseidonProof;
+use stwo::core::circle::{CirclePoint, Coset};
+use stwo::core::fields::m31::M31;
+use stwo::core::fields::qm31::SECURE_EXTENSION_DEGREE;
+use stwo::core::fields::qm31::{SecureField, QM31};
+use stwo::core::fields::{ExtensionOf, Field, FieldExpOps};
+use stwo::core::fri::SparseEvaluation;
+use stwo::core::utils::bit_reverse_index;
+use stwo::core::vcs::poseidon31_hash::Poseidon31Hash;
+use stwo::core::vcs::poseidon31_merkle::{Poseidon31MerkleChannel, Poseidon31MerkleHasher};
+use stwo::core::vcs::poseidon31_ref::Poseidon31CRH;
+use stwo::core::vcs::verifier::MerkleDecommitment;
+use stwo::core::vcs::verifier::MerkleVerifier;
+use stwo::core::vcs::MerkleHasher;
+use stwo_examples::plonk_with_poseidon::air::PlonkWithPoseidonProof;
 
 #[derive(Clone)]
 pub struct SinglePairMerkleProof {
@@ -605,13 +605,11 @@ impl InnerLayersHints {
 mod test {
     use crate::{AnswerHints, FiatShamirHints, FirstLayerHints, InnerLayersHints};
     use num_traits::One;
-    use stwo_prover::core::fields::qm31::QM31;
-    use stwo_prover::core::fri::FriConfig;
-    use stwo_prover::core::pcs::PcsConfig;
-    use stwo_prover::core::vcs::poseidon31_merkle::{
-        Poseidon31MerkleChannel, Poseidon31MerkleHasher,
-    };
-    use stwo_prover::examples::plonk_with_poseidon::air::PlonkWithPoseidonProof;
+    use stwo::core::fields::qm31::QM31;
+    use stwo::core::fri::FriConfig;
+    use stwo::core::pcs::PcsConfig;
+    use stwo::core::vcs::poseidon31_merkle::{Poseidon31MerkleChannel, Poseidon31MerkleHasher};
+    use stwo_examples::plonk_with_poseidon::air::PlonkWithPoseidonProof;
 
     #[test]
     fn test_folding() {

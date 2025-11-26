@@ -4,8 +4,8 @@ use circle_plonk_dsl_fields::{M31Var, QM31Var};
 use itertools::Itertools;
 use num_traits::One;
 use std::ops::Neg;
-use stwo_prover::core::fields::m31::M31;
-use stwo_prover::core::poly::line::LinePoly;
+use stwo::core::fields::m31::M31;
+use stwo::core::poly::line::LinePoly;
 
 #[derive(Clone, Debug)]
 pub struct LinePolyVar {
@@ -75,8 +75,8 @@ mod test {
     use circle_plonk_dsl_fields::{M31Var, QM31Var};
     use rand::prelude::StdRng;
     use rand::{Rng, SeedableRng};
-    use stwo_prover::core::circle::M31_CIRCLE_GEN;
-    use stwo_prover::core::poly::line::LinePoly;
+    use stwo::core::circle::M31_CIRCLE_GEN;
+    use stwo::core::poly::line::LinePoly;
 
     #[test]
     fn test_line_poly_var() {

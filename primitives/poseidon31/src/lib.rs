@@ -4,9 +4,9 @@ use circle_plonk_dsl_constraint_system::var::{AllocVar, AllocationMode, Var};
 use circle_plonk_dsl_constraint_system::{ConstraintSystemRef, ConstraintSystemType};
 use circle_plonk_dsl_fields::{M31Var, QM31Var};
 use num_traits::{One, Zero};
-use stwo_prover::core::fields::m31::M31;
-use stwo_prover::core::fields::qm31::QM31;
-use stwo_prover::examples::plonk_with_poseidon::poseidon::{PoseidonEntry, SwapOption};
+use stwo::core::fields::m31::M31;
+use stwo::core::fields::qm31::QM31;
+use stwo_examples::plonk_with_poseidon::poseidon::{PoseidonEntry, SwapOption};
 
 mod emulated;
 pub mod implementation;

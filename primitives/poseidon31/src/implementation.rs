@@ -1,8 +1,8 @@
 use crate::parameters::{
     FIRST_FOUR_ROUND_RC, LAST_FOUR_ROUNDS_RC, MAT_DIAG16_M_1, PARTIAL_ROUNDS_RC,
 };
-use stwo_prover::core::fields::m31::M31;
-use stwo_prover::core::fields::Field;
+use stwo::core::fields::m31::M31;
+use stwo::core::fields::Field;
 
 pub fn apply_4x4_mds_matrix(x0: M31, x1: M31, x2: M31, x3: M31) -> (M31, M31, M31, M31) {
     let t0 = x0 + x1;

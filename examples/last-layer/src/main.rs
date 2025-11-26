@@ -15,15 +15,15 @@ use circle_plonk_dsl_last_folding::data_structures::merkle_proofs::{
 use circle_plonk_dsl_last_folding::LastFoldingResults;
 use num_traits::One;
 use std::io::Write;
-use stwo_prover::core::fields::qm31::QM31;
-use stwo_prover::core::fri::FriConfig;
-use stwo_prover::core::pcs::PcsConfig;
-use stwo_prover::core::vcs::sha256_merkle::Sha256MerkleChannel;
-use stwo_prover::core::vcs::sha256_poseidon31_merkle::{
+use stwo::core::fields::qm31::QM31;
+use stwo::core::fri::FriConfig;
+use stwo::core::pcs::PcsConfig;
+use stwo::core::vcs::sha256_merkle::Sha256MerkleChannel;
+use stwo::core::vcs::sha256_poseidon31_merkle::{
     Sha256Poseidon31MerkleChannel, Sha256Poseidon31MerkleHasher,
 };
-use stwo_prover::examples::plonk_with_poseidon::air::PlonkWithPoseidonProof;
-use stwo_prover::examples::plonk_without_poseidon::air::{
+use stwo_examples::plonk_with_poseidon::air::PlonkWithPoseidonProof;
+use stwo_examples::plonk_without_poseidon::air::{
     prove_plonk_without_poseidon, verify_plonk_without_poseidon,
 };
 

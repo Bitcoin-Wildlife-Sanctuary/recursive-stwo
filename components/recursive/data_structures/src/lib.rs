@@ -7,16 +7,16 @@ use circle_plonk_dsl_hints::{DecommitHints, SinglePairMerkleProof, SinglePathMer
 use circle_plonk_dsl_line::LinePolyVar;
 use circle_plonk_dsl_merkle::Poseidon31MerkleHasherVar;
 use std::collections::BTreeMap;
-use stwo_prover::core::fields::m31::M31;
-use stwo_prover::core::fri::FriProof;
-use stwo_prover::core::pcs::TreeVec;
-use stwo_prover::core::prover::StarkProof;
-use stwo_prover::core::vcs::poseidon31_merkle::Poseidon31MerkleHasher;
-use stwo_prover::core::ColumnVec;
-use stwo_prover::examples::plonk_with_poseidon::air::{
+use stwo::core::fields::m31::M31;
+use stwo::core::fri::FriProof;
+use stwo::core::pcs::TreeVec;
+use stwo::core::proof::StarkProof;
+use stwo::core::vcs::poseidon31_merkle::Poseidon31MerkleHasher;
+use stwo::core::ColumnVec;
+use stwo_examples::plonk_with_poseidon::air::{
     PlonkWithPoseidonProof, PlonkWithPoseidonStatement0, PlonkWithPoseidonStatement1,
 };
-use stwo_prover::examples::plonk_with_poseidon::plonk::PlonkWithAcceleratorLookupElements;
+use stwo_examples::plonk_with_poseidon::plonk::PlonkWithAcceleratorLookupElements;
 
 #[derive(Debug, Clone)]
 pub struct PlonkWithPoseidonStatement0Var {
@@ -197,7 +197,7 @@ impl AllocVar for StarkProofVar {
         let proof_of_work = [
             M31Var::new_variables(
                 cs,
-                &M31::from((value.proof_of_work % ((1 << 22) - 1)) as u32),
+                &M31::from((value.proof_of_work & ((1 << 22) - 1)) as u32),
                 mode,
             ),
             M31Var::new_variables(
@@ -525,14 +525,12 @@ mod test {
         AnswerHints, FiatShamirHints, FirstLayerHints, SinglePathMerkleProof,
     };
     use num_traits::One;
-    use stwo_prover::core::fields::m31::M31;
-    use stwo_prover::core::fields::qm31::QM31;
-    use stwo_prover::core::fri::FriConfig;
-    use stwo_prover::core::pcs::PcsConfig;
-    use stwo_prover::core::vcs::poseidon31_merkle::{
-        Poseidon31MerkleChannel, Poseidon31MerkleHasher,
-    };
-    use stwo_prover::examples::plonk_with_poseidon::air::PlonkWithPoseidonProof;
+    use stwo::core::fields::m31::M31;
+    use stwo::core::fields::qm31::QM31;
+    use stwo::core::fri::FriConfig;
+    use stwo::core::pcs::PcsConfig;
+    use stwo::core::vcs::poseidon31_merkle::{Poseidon31MerkleChannel, Poseidon31MerkleHasher};
+    use stwo_examples::plonk_with_poseidon::air::PlonkWithPoseidonProof;
 
     #[test]
     fn test_merkle_path_proof() {

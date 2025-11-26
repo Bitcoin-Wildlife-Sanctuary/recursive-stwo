@@ -2,8 +2,8 @@ use crate::data_structures::{EvalAtRowVar, RelationEntryVar};
 use circle_plonk_dsl_constraint_system::var::Var;
 use circle_plonk_dsl_data_structures::LookupElementsVar;
 use circle_plonk_dsl_fields::QM31Var;
-use stwo_prover::core::fields::m31::M31;
-use stwo_prover::examples::plonk_with_poseidon::poseidon::Poseidon;
+use stwo::core::fields::m31::M31;
+use stwo_examples::plonk_with_poseidon::poseidon::Poseidon;
 
 const N_STATE: usize = 16;
 

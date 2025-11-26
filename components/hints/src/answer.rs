@@ -3,12 +3,12 @@ use itertools::Itertools;
 use std::collections::BTreeMap;
 use std::iter::zip;
 use std::marker::PhantomData;
-use stwo_prover::core::channel::MerkleChannel;
-use stwo_prover::core::fields::m31::BaseField;
-use stwo_prover::core::fields::qm31::SecureField;
-use stwo_prover::core::pcs::quotients::{fri_answers, PointSample};
-use stwo_prover::core::ColumnVec;
-use stwo_prover::examples::plonk_with_poseidon::air::PlonkWithPoseidonProof;
+use stwo::core::channel::MerkleChannel;
+use stwo::core::fields::m31::BaseField;
+use stwo::core::fields::qm31::SecureField;
+use stwo::core::pcs::quotients::{fri_answers, PointSample};
+use stwo::core::ColumnVec;
+use stwo_examples::plonk_with_poseidon::air::PlonkWithPoseidonProof;
 
 #[derive(Debug, Default)]
 pub struct SampledValuesPerLogSize(pub BTreeMap<u32, ColumnVec<BaseField>>);
@@ -96,13 +96,11 @@ impl<MC: MerkleChannel> AnswerHints<MC> {
 mod test {
     use crate::{AnswerHints, FiatShamirHints};
     use num_traits::One;
-    use stwo_prover::core::fields::qm31::QM31;
-    use stwo_prover::core::fri::FriConfig;
-    use stwo_prover::core::pcs::PcsConfig;
-    use stwo_prover::core::vcs::poseidon31_merkle::{
-        Poseidon31MerkleChannel, Poseidon31MerkleHasher,
-    };
-    use stwo_prover::examples::plonk_with_poseidon::air::PlonkWithPoseidonProof;
+    use stwo::core::fields::qm31::QM31;
+    use stwo::core::fri::FriConfig;
+    use stwo::core::pcs::PcsConfig;
+    use stwo::core::vcs::poseidon31_merkle::{Poseidon31MerkleChannel, Poseidon31MerkleHasher};
+    use stwo_examples::plonk_with_poseidon::air::PlonkWithPoseidonProof;
 
     #[test]
     fn test_compute_fri_answer_hints() {

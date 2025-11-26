@@ -3,11 +3,11 @@ use crate::LOG_CONSTRAINT_SYSTEM_RESERVED_SIZE;
 use num_traits::{One, Zero};
 use std::collections::HashMap;
 use std::ops::{Add, AddAssign, Mul, Neg, Sub};
-use stwo_prover::core::backend::simd::m31::N_LANES;
-use stwo_prover::core::backend::Column;
-use stwo_prover::core::fields::m31::{BaseField, M31};
-use stwo_prover::core::fields::qm31::QM31;
-use stwo_prover::examples::plonk_without_poseidon::plonk::PlonkWithoutAcceleratorCircuitTrace;
+use stwo::core::fields::m31::{BaseField, M31};
+use stwo::core::fields::qm31::QM31;
+use stwo::prover::backend::simd::m31::N_LANES;
+use stwo::prover::backend::Column;
+use stwo_examples::plonk_without_poseidon::plonk::PlonkWithoutAcceleratorCircuitTrace;
 
 #[derive(Debug)]
 pub struct PlonkWithoutPoseidonConstraintSystem {

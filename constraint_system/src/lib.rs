@@ -4,13 +4,11 @@ use plonk_without_poseidon::PlonkWithoutPoseidonConstraintSystem;
 use std::cell::RefCell;
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
-use stwo_prover::core::fields::m31::M31;
-use stwo_prover::core::fields::qm31::QM31;
-use stwo_prover::examples::plonk_with_poseidon::plonk::PlonkWithAcceleratorCircuitTrace;
-use stwo_prover::examples::plonk_with_poseidon::poseidon::{
-    PoseidonEntry, PoseidonFlow, SwapOption,
-};
-use stwo_prover::examples::plonk_without_poseidon::plonk::PlonkWithoutAcceleratorCircuitTrace;
+use stwo::core::fields::m31::M31;
+use stwo::core::fields::qm31::QM31;
+use stwo_examples::plonk_with_poseidon::plonk::PlonkWithAcceleratorCircuitTrace;
+use stwo_examples::plonk_with_poseidon::poseidon::{PoseidonEntry, PoseidonFlow, SwapOption};
+use stwo_examples::plonk_without_poseidon::plonk::PlonkWithoutAcceleratorCircuitTrace;
 
 pub mod var;
 

@@ -3,7 +3,7 @@ use circle_plonk_dsl_constraint_system::var::Var;
 use circle_plonk_dsl_data_structures::LookupElementsVar;
 use circle_plonk_dsl_fields::QM31Var;
 use std::ops::Neg;
-use stwo_prover::examples::plonk::Plonk;
+use stwo_examples::plonk::Plonk;
 
 pub fn evaluate_plonk<'a>(
     lookup_elements: &LookupElementsVar,

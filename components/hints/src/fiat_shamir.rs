@@ -2,22 +2,22 @@ use itertools::Itertools;
 use num_traits::{One, Zero};
 use std::collections::{BTreeMap, BTreeSet};
 use std::ops::{Add, Mul, Neg};
-use stwo_prover::constraint_framework::{Relation, PREPROCESSED_TRACE_IDX};
-use stwo_prover::core::air::Components;
-use stwo_prover::core::channel::{Channel, MerkleChannel};
-use stwo_prover::core::circle::CirclePoint;
-use stwo_prover::core::fields::m31::BaseField;
-use stwo_prover::core::fields::qm31::{SecureField, QM31};
-use stwo_prover::core::fields::secure_column::SECURE_EXTENSION_DEGREE;
-use stwo_prover::core::fields::{Field, FieldExpOps};
-use stwo_prover::core::fri::{CirclePolyDegreeBound, FriVerifier};
-use stwo_prover::core::pcs::{CommitmentSchemeVerifier, PcsConfig, TreeSubspan, TreeVec};
-use stwo_prover::core::vcs::ops::MerkleHasher;
-use stwo_prover::core::ColumnVec;
-use stwo_prover::examples::plonk_with_poseidon::air::{
+use stwo::core::air::Components;
+use stwo::core::channel::{Channel, MerkleChannel};
+use stwo::core::circle::CirclePoint;
+use stwo::core::fields::m31::BaseField;
+use stwo::core::fields::qm31::SECURE_EXTENSION_DEGREE;
+use stwo::core::fields::qm31::{SecureField, QM31};
+use stwo::core::fields::{Field, FieldExpOps};
+use stwo::core::fri::{CirclePolyDegreeBound, FriVerifier};
+use stwo::core::pcs::{CommitmentSchemeVerifier, PcsConfig, TreeSubspan, TreeVec};
+use stwo::core::vcs::MerkleHasher;
+use stwo::core::ColumnVec;
+use stwo_constraint_framework::{Relation, PREPROCESSED_TRACE_IDX};
+use stwo_examples::plonk_with_poseidon::air::{
     PlonkWithPoseidonComponents, PlonkWithPoseidonProof,
 };
-use stwo_prover::examples::plonk_with_poseidon::plonk::PlonkWithAcceleratorLookupElements;
+use stwo_examples::plonk_with_poseidon::plonk::PlonkWithAcceleratorLookupElements;
 
 pub struct FiatShamirHints<MC: MerkleChannel> {
     pub preprocessed_commitment: <MC::H as MerkleHasher>::Hash,
@@ -61,6 +61,8 @@ pub struct FiatShamirHints<MC: MerkleChannel> {
     pub mask_poseidon: TreeVec<Vec<Vec<isize>>>,
 
     pub fri_verifier: FriVerifier<MC>,
+
+    pub composition_log_degree_bound: u32,
 }
 
 impl<MC: MerkleChannel> FiatShamirHints<MC> {
@@ -92,11 +94,10 @@ impl<MC: MerkleChannel> FiatShamirHints<MC> {
             PlonkWithPoseidonComponents::new(&proof.stmt0, &lookup_elements, &proof.stmt1);
 
         let plonk_tree_subspan = components.plonk.trace_locations().to_vec();
-        let plonk_prepared_column_indices =
-            components.plonk.preproccessed_column_indices().to_vec();
+        let plonk_prepared_column_indices = components.plonk.preprocessed_column_indices().to_vec();
         let poseidon_tree_subspan = components.poseidon.trace_locations().to_vec();
         let poseidon_prepared_column_indices =
-            components.poseidon.preproccessed_column_indices().to_vec();
+            components.poseidon.preprocessed_column_indices().to_vec();
 
         // Get the mask relations
         let mask_plonk = components.plonk.info.mask_offsets.clone();
@@ -124,17 +125,17 @@ impl<MC: MerkleChannel> FiatShamirHints<MC> {
             components: components.components().to_vec(),
             n_preprocessed_columns,
         };
-        let random_coeff = channel.draw_felt();
+        let random_coeff = channel.draw_secure_felt();
 
         // Read composition polynomial commitment.
         commitment_scheme.commit(
             *proof.stark_proof.commitments.last().unwrap(),
-            &[components.composition_log_degree_bound(); SECURE_EXTENSION_DEGREE],
+            &[components.composition_log_degree_bound() - 1; 2 * SECURE_EXTENSION_DEGREE],
             channel,
         );
 
         // Draw OODS point.
-        let oods_t = channel.draw_felt();
+        let oods_t = channel.draw_secure_felt();
         let oods_point = {
             let t_square = oods_t.square();
 
@@ -151,15 +152,22 @@ impl<MC: MerkleChannel> FiatShamirHints<MC> {
         // Get mask sample points relative to oods point.
         let mut sample_points = components.mask_points(oods_point);
         // Add the composition polynomial mask points.
-        sample_points.push(vec![vec![oods_point]; SECURE_EXTENSION_DEGREE]);
+        sample_points.push(vec![vec![oods_point]; 2 * SECURE_EXTENSION_DEGREE]);
 
         channel.mix_felts(&proof.stark_proof.sampled_values.clone().flatten_cols());
-        let after_sampled_values_random_coeff = channel.draw_felt();
+        let after_sampled_values_random_coeff = channel.draw_secure_felt();
 
         let bounds = commitment_scheme
             .column_log_sizes()
+            .zip_cols(&sample_points)
             .flatten()
             .into_iter()
+            .filter_map(|(log_size, sample_points)| {
+                if sample_points.is_empty() {
+                    return None;
+                }
+                Some(log_size)
+            })
             .sorted()
             .rev()
             .dedup()
@@ -197,14 +205,15 @@ impl<MC: MerkleChannel> FiatShamirHints<MC> {
             fri_alphas.push(layer.folding_alpha);
         }
         let nonce = proof.stark_proof.proof_of_work;
-        channel.mix_u64(nonce);
 
         assert!(
-            channel.trailing_zeros() >= config.pow_bits,
-            "pow failed: {} < {}",
-            channel.trailing_zeros(),
+            channel.verify_pow_nonce(config.pow_bits, nonce),
+            "pow failed: nonce {} does not satisfy {} bits",
+            nonce,
             config.pow_bits
         );
+
+        channel.mix_u64(nonce);
 
         let trees_log_sizes = proof.stmt0.log_sizes();
 
@@ -222,15 +231,14 @@ impl<MC: MerkleChannel> FiatShamirHints<MC> {
             let mut raw_queries = vec![];
 
             while raw_queries.len() < config.fri_config.n_queries {
-                let felts = channel.draw_felts(2);
-                raw_queries.extend_from_slice(&felts[0].to_m31_array());
-                raw_queries.extend_from_slice(&felts[1].to_m31_array());
+                let felts = channel.draw_u32s();
+                raw_queries.extend_from_slice(&felts);
             }
             raw_queries.truncate(config.fri_config.n_queries);
 
             let mut queries = vec![];
             for raw_query in raw_queries.iter() {
-                queries.push(raw_query.0 & ((1 << max_first_layer_column_log_size) - 1));
+                queries.push((*raw_query as usize) & ((1 << max_first_layer_column_log_size) - 1));
             }
 
             let mut map = BTreeMap::new();
@@ -294,6 +302,7 @@ impl<MC: MerkleChannel> FiatShamirHints<MC> {
             mask_plonk,
             mask_poseidon,
             fri_verifier,
+            composition_log_degree_bound: components.composition_log_degree_bound(),
         }
     }
 }

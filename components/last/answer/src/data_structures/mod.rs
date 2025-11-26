@@ -5,10 +5,10 @@ use merkle_proofs::{
     LastSinglePathMerkleProof, LastSinglePathMerkleProofInput, LastSinglePathMerkleProofInputVar,
     LastSinglePathMerkleProofVar,
 };
-use stwo_prover::core::vcs::sha256_poseidon31_merkle::{
+use stwo::core::vcs::sha256_poseidon31_merkle::{
     Sha256Poseidon31MerkleChannel, Sha256Poseidon31MerkleHasher,
 };
-use stwo_prover::examples::plonk_with_poseidon::air::PlonkWithPoseidonProof;
+use stwo_examples::plonk_with_poseidon::air::PlonkWithPoseidonProof;
 
 pub mod merkle_proofs;
 

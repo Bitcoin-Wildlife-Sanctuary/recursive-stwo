@@ -3,10 +3,10 @@ use circle_plonk_dsl_constraint_system::var::{AllocVar, AllocationMode, Var};
 use circle_plonk_dsl_constraint_system::ConstraintSystemRef;
 use num_traits::{One, Zero};
 use std::ops::{Add, Mul, Neg, Sub};
-use stwo_prover::core::fields::cm31::CM31;
-use stwo_prover::core::fields::m31::M31;
-use stwo_prover::core::fields::qm31::QM31;
-use stwo_prover::core::fields::FieldExpOps;
+use stwo::core::fields::cm31::CM31;
+use stwo::core::fields::m31::M31;
+use stwo::core::fields::qm31::QM31;
+use stwo::core::fields::FieldExpOps;
 
 #[derive(Debug, Clone)]
 pub struct QM31Var {
@@ -476,12 +476,12 @@ mod test {
     use num_traits::One;
     use rand::prelude::SmallRng;
     use rand::{Rng, SeedableRng};
-    use stwo_prover::core::fields::qm31::QM31;
-    use stwo_prover::core::fields::FieldExpOps;
-    use stwo_prover::core::fri::FriConfig;
-    use stwo_prover::core::pcs::PcsConfig;
-    use stwo_prover::core::vcs::poseidon31_merkle::Poseidon31MerkleChannel;
-    use stwo_prover::examples::plonk_with_poseidon::air::{
+    use stwo::core::fields::qm31::QM31;
+    use stwo::core::fields::FieldExpOps;
+    use stwo::core::fri::FriConfig;
+    use stwo::core::pcs::PcsConfig;
+    use stwo::core::vcs::poseidon31_merkle::Poseidon31MerkleChannel;
+    use stwo_examples::plonk_with_poseidon::air::{
         prove_plonk_with_poseidon, verify_plonk_with_poseidon,
     };
 

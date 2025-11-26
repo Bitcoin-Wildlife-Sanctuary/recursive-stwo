@@ -15,11 +15,11 @@ use std::cmp::Reverse;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::iter::zip;
 use std::ops::Add;
-use stwo_prover::constraint_framework::PREPROCESSED_TRACE_IDX;
-use stwo_prover::core::pcs::{PcsConfig, TreeVec};
-use stwo_prover::core::poly::circle::CanonicCoset;
-use stwo_prover::core::vcs::poseidon31_merkle::Poseidon31MerkleChannel;
-use stwo_prover::core::ColumnVec;
+use stwo::core::pcs::{PcsConfig, TreeVec};
+use stwo::core::poly::circle::CanonicCoset;
+use stwo::core::vcs::poseidon31_merkle::Poseidon31MerkleChannel;
+use stwo::core::ColumnVec;
+use stwo_constraint_framework::PREPROCESSED_TRACE_IDX;
 
 pub mod data_structures;
 
@@ -158,7 +158,7 @@ impl AnswerResults {
 
         let mut sampled_points =
             TreeVec::concat_cols([mask_points_plonk, mask_points_poseidon].into_iter());
-        sampled_points.push(vec![vec![(ShiftIndex::Zero, oods_point.clone())]; 4]);
+        sampled_points.push(vec![vec![(ShiftIndex::Zero, oods_point.clone())]; 8]);
 
         let samples = sampled_points
             .zip_cols(proof.stark_proof.sampled_values.clone())
@@ -393,13 +393,11 @@ mod test {
     use circle_plonk_dsl_fields::QM31Var;
     use circle_plonk_dsl_hints::{AnswerHints, DecommitHints, FiatShamirHints};
     use num_traits::One;
-    use stwo_prover::core::fields::qm31::QM31;
-    use stwo_prover::core::fri::FriConfig;
-    use stwo_prover::core::pcs::PcsConfig;
-    use stwo_prover::core::vcs::poseidon31_merkle::{
-        Poseidon31MerkleChannel, Poseidon31MerkleHasher,
-    };
-    use stwo_prover::examples::plonk_with_poseidon::air::{
+    use stwo::core::fields::qm31::QM31;
+    use stwo::core::fri::FriConfig;
+    use stwo::core::pcs::PcsConfig;
+    use stwo::core::vcs::poseidon31_merkle::{Poseidon31MerkleChannel, Poseidon31MerkleHasher};
+    use stwo_examples::plonk_with_poseidon::air::{
         prove_plonk_with_poseidon, verify_plonk_with_poseidon, PlonkWithPoseidonProof,
     };
 

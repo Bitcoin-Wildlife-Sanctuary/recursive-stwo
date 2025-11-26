@@ -6,9 +6,9 @@ use itertools::Itertools;
 use num_traits::One;
 use std::collections::BTreeMap;
 use std::ops::{Index, Neg, RangeInclusive};
-use stwo_prover::core::circle::CirclePoint;
-use stwo_prover::core::fields::m31::M31;
-use stwo_prover::core::poly::circle::CanonicCoset;
+use stwo::core::circle::CirclePoint;
+use stwo::core::fields::m31::M31;
+use stwo::core::poly::circle::CanonicCoset;
 
 pub struct QueryPositionsPerLogSizeVar {
     pub range: RangeInclusive<u32>,

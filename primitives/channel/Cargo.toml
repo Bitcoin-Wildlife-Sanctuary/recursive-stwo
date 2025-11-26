@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-stwo-prover.workspace = true
+stwo.workspace = true
 circle-plonk-dsl-constraint-system = { path = "../../constraint_system" }
 circle-plonk-dsl-poseidon31 = { path = "../poseidon31" }
 circle-plonk-dsl-fields = { path = "../fields" }

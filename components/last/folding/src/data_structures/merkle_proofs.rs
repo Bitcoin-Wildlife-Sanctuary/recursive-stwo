@@ -5,16 +5,16 @@ use circle_plonk_dsl_hints::{AnswerHints, FiatShamirHints, FirstLayerHints};
 use itertools::{zip_eq, Itertools};
 use num_traits::Zero;
 use std::collections::{BTreeMap, BTreeSet};
-use stwo_prover::core::circle::{CirclePoint, Coset};
-use stwo_prover::core::fields::m31::M31;
-use stwo_prover::core::fields::qm31::{SecureField, QM31};
-use stwo_prover::core::fields::{ExtensionOf, Field, FieldExpOps};
-use stwo_prover::core::utils::bit_reverse_index;
-use stwo_prover::core::vcs::prover::MerkleDecommitment;
-use stwo_prover::core::vcs::sha256_poseidon31_merkle::{
+use stwo::core::circle::{CirclePoint, Coset};
+use stwo::core::fields::m31::M31;
+use stwo::core::fields::qm31::{SecureField, QM31};
+use stwo::core::fields::{ExtensionOf, Field, FieldExpOps};
+use stwo::core::utils::bit_reverse_index;
+use stwo::core::vcs::sha256_poseidon31_merkle::{
     Sha256Poseidon31MerkleChannel, Sha256Poseidon31MerkleHasher,
 };
-use stwo_prover::examples::plonk_with_poseidon::air::PlonkWithPoseidonProof;
+use stwo::core::vcs::verifier::MerkleDecommitment;
+use stwo_examples::plonk_with_poseidon::air::PlonkWithPoseidonProof;
 
 #[derive(Clone, Debug)]
 pub struct LastSinglePairMerkleProof {

@@ -5,10 +5,10 @@ use indexmap::IndexMap;
 use itertools::{izip, zip_eq};
 use num_traits::Zero;
 use std::ops::Neg;
-use stwo_prover::core::circle::CirclePoint;
-use stwo_prover::core::fields::m31::M31;
-use stwo_prover::core::fields::qm31::QM31;
-use stwo_prover::core::fields::ComplexConjugate;
+use stwo::core::circle::CirclePoint;
+use stwo::core::fields::m31::M31;
+use stwo::core::fields::qm31::QM31;
+use stwo::core::fields::ComplexConjugate;
 
 #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
 pub enum ShiftIndex {
@@ -65,7 +65,6 @@ impl ColumnSampleBatchVar {
 
 pub struct QuotientConstantsVar {
     pub line_coeffs: Vec<Vec<(QM31Var, QM31Var, QM31Var)>>,
-    pub batch_random_coeffs: Vec<QM31Var>,
 }
 
 pub fn accumulate_row_quotients_var(
@@ -77,10 +76,9 @@ pub fn accumulate_row_quotients_var(
     let cs = domain_point.cs();
     let denominator_inverses = denominator_inverses_var(sample_batches, domain_point);
     let mut row_accumulator = QM31Var::zero(&cs);
-    for (sample_batch, line_coeffs, batch_coeff, denominator_inverse) in izip!(
+    for (sample_batch, line_coeffs, denominator_inverse) in izip!(
         sample_batches,
         &quotient_constants.line_coeffs,
-        &quotient_constants.batch_random_coeffs,
         denominator_inverses
     ) {
         let mut numerator = QM31Var::zero(&cs);
@@ -97,7 +95,7 @@ pub fn accumulate_row_quotients_var(
             numerator = &numerator + &(&value - &linear_term);
         }
 
-        row_accumulator = &(&row_accumulator * batch_coeff) + &(&numerator * &denominator_inverse);
+        row_accumulator = &row_accumulator + &(&numerator * &denominator_inverse);
     }
     row_accumulator
 }
@@ -133,7 +131,6 @@ pub fn quotient_constants_var(
 ) -> QuotientConstantsVar {
     QuotientConstantsVar {
         line_coeffs: column_line_coeffs_var(sample_batches, random_coeff),
-        batch_random_coeffs: batch_random_coeffs_var(sample_batches, random_coeff),
     }
 }
 
@@ -167,31 +164,26 @@ pub fn column_line_coeffs_var(
     random_coeff: &QM31Var,
 ) -> Vec<Vec<(QM31Var, QM31Var, QM31Var)>> {
     let cs = random_coeff.cs();
+    let mut alpha = QM31Var::new_constant(
+        &cs,
+        &QM31::from_m31(M31::zero(), M31::zero(), M31::from(2).neg(), M31::zero()),
+    );
     sample_batches
         .iter()
         .map(|sample_batch| {
-            let mut alpha = QM31Var::new_constant(
-                &cs,
-                &QM31::from_m31(M31::zero(), M31::zero(), M31::from(2).neg(), M31::zero()),
-            );
             sample_batch
                 .columns_and_values
                 .iter()
                 .map(|(_, sampled_value)| {
+                    let v = complex_conjugate_line_coeffs_var(
+                        &sample_batch.point,
+                        sampled_value,
+                        &alpha,
+                    );
                     alpha = &alpha * random_coeff;
-                    complex_conjugate_line_coeffs_var(&sample_batch.point, sampled_value, &alpha)
+                    v
                 })
                 .collect()
         })
-        .collect()
-}
-
-pub fn batch_random_coeffs_var(
-    sample_batches: &[ColumnSampleBatchVar],
-    random_coeff: &QM31Var,
-) -> Vec<QM31Var> {
-    sample_batches
-        .iter()
-        .map(|sb| random_coeff.pow(sb.columns_and_values.len() as u128))
         .collect()
 }

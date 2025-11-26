@@ -4,7 +4,7 @@ use circle_plonk_dsl_fiat_shamir::FiatShamirResults;
 use circle_plonk_dsl_fields::QM31Var;
 use circle_plonk_dsl_hints::{FiatShamirHints, FirstLayerHints, InnerLayersHints};
 use std::collections::{BTreeMap, HashMap};
-use stwo_prover::core::vcs::poseidon31_merkle::Poseidon31MerkleChannel;
+use stwo::core::vcs::poseidon31_merkle::Poseidon31MerkleChannel;
 
 pub struct FoldingResults;
 
@@ -219,13 +219,11 @@ mod test {
         AnswerHints, DecommitHints, FiatShamirHints, FirstLayerHints, InnerLayersHints,
     };
     use num_traits::One;
-    use stwo_prover::core::fields::qm31::QM31;
-    use stwo_prover::core::fri::FriConfig;
-    use stwo_prover::core::pcs::PcsConfig;
-    use stwo_prover::core::vcs::poseidon31_merkle::{
-        Poseidon31MerkleChannel, Poseidon31MerkleHasher,
-    };
-    use stwo_prover::examples::plonk_with_poseidon::air::{
+    use stwo::core::fields::qm31::QM31;
+    use stwo::core::fri::FriConfig;
+    use stwo::core::pcs::PcsConfig;
+    use stwo::core::vcs::poseidon31_merkle::{Poseidon31MerkleChannel, Poseidon31MerkleHasher};
+    use stwo_examples::plonk_with_poseidon::air::{
         prove_plonk_with_poseidon, verify_plonk_with_poseidon, PlonkWithPoseidonProof,
     };
 

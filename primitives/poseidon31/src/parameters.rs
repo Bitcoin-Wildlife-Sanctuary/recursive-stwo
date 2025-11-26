@@ -1,4 +1,4 @@
-use stwo_prover::core::fields::m31::M31;
+use stwo::core::fields::m31::M31;
 
 /// Generated using https://github.com/HorizenLabs/poseidon2/blob/main/poseidon2_rust_params.sage
 /// with p = 2^31 - 1 and t = 16

@@ -226,16 +226,14 @@ mod test {
     use num_traits::One;
     use rand::rngs::SmallRng;
     use rand::{Rng, SeedableRng};
-    use stwo_prover::core::fields::m31::M31;
-    use stwo_prover::core::fields::qm31::QM31;
-    use stwo_prover::core::fri::FriConfig;
-    use stwo_prover::core::pcs::PcsConfig;
-    use stwo_prover::core::vcs::ops::MerkleHasher;
-    use stwo_prover::core::vcs::poseidon31_hash::Poseidon31Hash;
-    use stwo_prover::core::vcs::poseidon31_merkle::{
-        Poseidon31MerkleChannel, Poseidon31MerkleHasher,
-    };
-    use stwo_prover::examples::plonk_with_poseidon::air::{
+    use stwo::core::fields::m31::M31;
+    use stwo::core::fields::qm31::QM31;
+    use stwo::core::fri::FriConfig;
+    use stwo::core::pcs::PcsConfig;
+    use stwo::core::vcs::poseidon31_hash::Poseidon31Hash;
+    use stwo::core::vcs::poseidon31_merkle::{Poseidon31MerkleChannel, Poseidon31MerkleHasher};
+    use stwo::core::vcs::MerkleHasher;
+    use stwo_examples::plonk_with_poseidon::air::{
         prove_plonk_with_poseidon, verify_plonk_with_poseidon,
     };
 

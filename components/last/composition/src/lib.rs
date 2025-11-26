@@ -8,8 +8,8 @@ use circle_plonk_dsl_fields::QM31Var;
 use circle_plonk_dsl_hints::FiatShamirHints;
 use circle_plonk_dsl_last_data_structures::LastPlonkWithPoseidonProofVar;
 use itertools::Itertools;
-use stwo_prover::constraint_framework::PREPROCESSED_TRACE_IDX;
-use stwo_prover::core::vcs::sha256_poseidon31_merkle::Sha256Poseidon31MerkleChannel;
+use stwo::core::vcs::sha256_poseidon31_merkle::Sha256Poseidon31MerkleChannel;
+use stwo_constraint_framework::PREPROCESSED_TRACE_IDX;
 
 pub struct LastCompositionCheck;
 
@@ -87,10 +87,18 @@ impl LastCompositionCheck {
         evaluate_poseidon(lookup_elements, eval_row_poseidon);
 
         let computed_composition = evaluation_accumulator.finalize();
-        let expected_composition = &(&(&proof.stark_proof.sampled_values[3][0][0]
+        let left_value = &(&(&proof.stark_proof.sampled_values[3][0][0]
             + &proof.stark_proof.sampled_values[3][1][0].shift_by_i())
             + &proof.stark_proof.sampled_values[3][2][0].shift_by_j())
             + &proof.stark_proof.sampled_values[3][3][0].shift_by_ij();
+        let right_value = &(&(&proof.stark_proof.sampled_values[3][4][0]
+            + &proof.stark_proof.sampled_values[3][5][0].shift_by_i())
+            + &proof.stark_proof.sampled_values[3][6][0].shift_by_j())
+            + &proof.stark_proof.sampled_values[3][7][0].shift_by_ij();
+        let expected_composition = &left_value
+            + &(&right_value
+                * &oods_point
+                    .repeated_double_x_only(fiat_shamir_hints.composition_log_degree_bound - 2));
 
         computed_composition.equalverify(&expected_composition);
     }
@@ -107,17 +115,17 @@ mod test {
         LastFiatShamirInput, LastFiatShamirInputVar, LastFiatShamirResults,
     };
     use num_traits::One;
-    use stwo_prover::core::fields::qm31::QM31;
-    use stwo_prover::core::fri::FriConfig;
-    use stwo_prover::core::pcs::PcsConfig;
-    use stwo_prover::core::vcs::sha256_merkle::Sha256MerkleChannel;
-    use stwo_prover::core::vcs::sha256_poseidon31_merkle::{
+    use stwo::core::fields::qm31::QM31;
+    use stwo::core::fri::FriConfig;
+    use stwo::core::pcs::PcsConfig;
+    use stwo::core::vcs::sha256_merkle::Sha256MerkleChannel;
+    use stwo::core::vcs::sha256_poseidon31_merkle::{
         Sha256Poseidon31MerkleChannel, Sha256Poseidon31MerkleHasher,
     };
-    use stwo_prover::examples::plonk_with_poseidon::air::{
+    use stwo_examples::plonk_with_poseidon::air::{
         verify_plonk_with_poseidon, PlonkWithPoseidonProof,
     };
-    use stwo_prover::examples::plonk_without_poseidon::air::{
+    use stwo_examples::plonk_without_poseidon::air::{
         prove_plonk_without_poseidon, verify_plonk_without_poseidon,
     };
 

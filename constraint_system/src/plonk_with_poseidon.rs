@@ -4,13 +4,13 @@ use num_traits::{One, Zero};
 use std::cmp::max;
 use std::collections::HashMap;
 use std::ops::Neg;
-use stwo_prover::core::backend::simd::m31::N_LANES;
-use stwo_prover::core::backend::Column;
-use stwo_prover::core::fields::m31::M31;
-use stwo_prover::core::fields::qm31::QM31;
-use stwo_prover::core::vcs::poseidon31_ref::poseidon2_permute;
-use stwo_prover::examples::plonk_with_poseidon::plonk::PlonkWithAcceleratorCircuitTrace;
-use stwo_prover::examples::plonk_with_poseidon::poseidon::{
+use stwo::core::fields::m31::M31;
+use stwo::core::fields::qm31::QM31;
+use stwo::core::vcs::poseidon31_ref::poseidon2_permute;
+use stwo::prover::backend::simd::m31::N_LANES;
+use stwo::prover::backend::Column;
+use stwo_examples::plonk_with_poseidon::plonk::PlonkWithAcceleratorCircuitTrace;
+use stwo_examples::plonk_with_poseidon::poseidon::{
     PoseidonEntry, PoseidonFlow, SwapOption, CONSTANT_1, CONSTANT_2, CONSTANT_3,
 };
 

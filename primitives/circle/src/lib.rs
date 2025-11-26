@@ -6,9 +6,9 @@ use circle_plonk_dsl_fields::{M31Var, QM31Var};
 use itertools::Itertools;
 use num_traits::{One, Zero};
 use std::ops::{Add, Neg};
-use stwo_prover::core::circle::{CirclePoint, Coset};
-use stwo_prover::core::fields::m31::{BaseField, M31};
-use stwo_prover::core::fields::qm31::{SecureField, QM31};
+use stwo::core::circle::{CirclePoint, Coset};
+use stwo::core::fields::m31::{BaseField, M31};
+use stwo::core::fields::qm31::{SecureField, QM31};
 
 #[derive(Clone, Debug)]
 pub struct CirclePointM31Var {
@@ -222,6 +222,15 @@ impl CirclePointQM31Var {
         let [t, _] = channel.draw_felts();
         Self::from_t(&t)
     }
+
+    pub fn repeated_double_x_only(&self, log_size: u32) -> QM31Var {
+        let mut x = self.clone().x;
+        for _ in 0..log_size {
+            let x_square = &x * &x;
+            x = &(&x_square + &x_square) - &M31Var::one(&x.cs());
+        }
+        x
+    }
 }
 
 impl Add<&CirclePoint<M31>> for &CirclePointQM31Var {
@@ -247,9 +256,9 @@ mod test {
     use circle_plonk_dsl_constraint_system::var::AllocVar;
     use circle_plonk_dsl_constraint_system::ConstraintSystemRef;
     use circle_plonk_dsl_fields::M31Var;
-    use stwo_prover::core::fields::m31::M31;
-    use stwo_prover::core::poly::circle::CanonicCoset;
-    use stwo_prover::core::utils::bit_reverse_index;
+    use stwo::core::fields::m31::M31;
+    use stwo::core::poly::circle::CanonicCoset;
+    use stwo::core::utils::bit_reverse_index;
 
     #[test]
     fn test_bit_reverse_at() {

@@ -3,8 +3,8 @@ use circle_plonk_dsl_constraint_system::ConstraintSystemRef;
 use circle_plonk_dsl_fields::M31Var;
 use num_traits::{One, Zero};
 use std::ops::{Neg, Range, RangeFrom};
-use stwo_prover::core::fields::m31::M31;
-use stwo_prover::core::fields::qm31::QM31;
+use stwo::core::fields::m31::M31;
+use stwo::core::fields::qm31::QM31;
 
 #[derive(Clone)]
 pub struct BitsVar {
