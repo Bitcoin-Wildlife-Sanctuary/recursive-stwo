@@ -8,9 +8,12 @@ use circle_plonk_dsl_hints::FiatShamirHints;
 use circle_plonk_dsl_last_data_structures::LastPlonkWithPoseidonProofVar;
 use circle_plonk_dsl_merkle::Poseidon31MerkleHasherVar;
 use itertools::Itertools;
+use num_traits::Zero;
+use stwo::core::fields::m31::M31;
 use stwo::core::fields::qm31::QM31;
 use stwo::core::vcs::poseidon31_hash::Poseidon31Hash;
 use stwo::core::vcs::poseidon31_merkle::Poseidon31MerkleHasher;
+use stwo::core::vcs::poseidon31_ref::Poseidon31CRH;
 use stwo::core::vcs::sha256_poseidon31_merkle::{
     Sha256Poseidon31MerkleChannel, Sha256Poseidon31MerkleHasher,
 };
@@ -41,7 +44,14 @@ impl LastFiatShamirInput {
             .iter()
             .flat_map(|v| v.to_m31_array())
             .collect_vec();
-        let sampled_values_hash = Poseidon31MerkleHasher::hash_column_get_rate(&elems);
+        let sampled_values_hash = {
+            let hash = Poseidon31MerkleHasher::hash_column_get_capacity(&elems);
+
+            let mut state = [M31::zero(); 16];
+            state[8..].copy_from_slice(&hash.0);
+
+            Poseidon31Hash(Poseidon31CRH::permute_get_rate(&state))
+        };
         let plonk_total_sum = proof.stmt1.plonk_total_sum;
         let poseidon_total_sum = proof.stmt1.poseidon_total_sum;
         let lookup_element_z = fiat_shamir_hints.z;

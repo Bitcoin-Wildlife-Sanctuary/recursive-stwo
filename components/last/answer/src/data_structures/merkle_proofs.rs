@@ -4,6 +4,8 @@ use circle_plonk_dsl_fields::{M31Var, QM31Var};
 use circle_plonk_dsl_merkle::Poseidon31MerkleHasherVar;
 use itertools::Itertools;
 use num_traits::Zero;
+use stwo::core::vcs::poseidon31_hash::Poseidon31Hash;
+use stwo::core::vcs::poseidon31_ref::Poseidon31CRH;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use stwo::core::fields::m31::{BaseField, M31};
 use stwo::core::fields::qm31::QM31;
@@ -185,7 +187,11 @@ impl LastSinglePathMerkleProofInput {
                     ],
                 );
             } else {
-                let hash = Poseidon31MerkleHasher::hash_column_get_rate(column_values);
+                let hash = Poseidon31MerkleHasher::hash_column_get_capacity(&column_values);
+                let mut state = [M31::zero(); 16];
+                state[8..].copy_from_slice(&hash.0);
+                let hash = Poseidon31Hash(Poseidon31CRH::permute_get_rate(&state));
+                
                 packed_columns.insert(
                     log_size,
                     vec![

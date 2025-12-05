@@ -62,7 +62,8 @@ impl Poseidon31MerkleHasherVar {
         let first_chunk = Poseidon2HalfVar::from_m31(&input[0..8]);
 
         if num_chunk == 1 {
-            return Poseidon2HalfVar::permute_get_rate(&first_chunk, &zero);
+            let digest = Poseidon2HalfVar::permute_get_capacity(&first_chunk, &zero);
+            return Poseidon2HalfVar::permute_get_rate(&Poseidon2HalfVar::zero(&cs), &digest);
         }
 
         let mut digest = Poseidon2HalfVar::permute_get_capacity(&first_chunk, &zero);
@@ -77,58 +78,22 @@ impl Poseidon31MerkleHasherVar {
             input[0..8].clone_from_slice(&m31[len - 8..]);
 
             let left = Poseidon2HalfVar::from_m31(&input);
-            digest = Poseidon2HalfVar::permute_get_rate(&left, &digest);
+            digest = Poseidon2HalfVar::permute_get_capacity(&left, &digest);
         } else {
             let mut input: [M31Var; 8] = std::array::from_fn(|_| M31Var::zero(&cs));
             input[0..remain].clone_from_slice(&m31[len - remain..]);
 
             let left = Poseidon2HalfVar::from_m31(&input);
-            digest = Poseidon2HalfVar::permute_get_rate(&left, &digest);
-        }
-
-        digest
-    }
-
-    pub fn hash_qm31_columns_get_rate(qm31: &[QM31Var]) -> Poseidon2HalfVar {
-        let len = qm31.len();
-        let num_chunk = len.div_ceil(2);
-        let cs = qm31[0].cs();
-
-        // compute the first hash, which consists of 8 elements, and it comes from (no more than)
-        // 16 elements
-
-        let mut input: [QM31Var; 2] = std::array::from_fn(|_| QM31Var::zero(&cs));
-        input[0..min(len, 2)].clone_from_slice(&qm31[0..min(len, 2)]);
-
-        let zero = Poseidon2HalfVar::zero(&cs);
-        let first_chunk = Poseidon2HalfVar::from_qm31(&input[0], &input[1]);
-
-        if num_chunk == 1 {
-            return Poseidon2HalfVar::permute_get_rate(&first_chunk, &zero);
-        }
-
-        let mut digest = Poseidon2HalfVar::permute_get_capacity(&first_chunk, &zero);
-        for chunk in qm31.chunks_exact(2).skip(1).take(num_chunk - 2) {
-            let left = Poseidon2HalfVar::from_qm31(&chunk[0], &chunk[1]);
             digest = Poseidon2HalfVar::permute_get_capacity(&left, &digest);
         }
 
-        let remain = len % 2;
-        if remain == 0 {
-            let mut input: [QM31Var; 2] = std::array::from_fn(|_| QM31Var::zero(&cs));
-            input[0..2].clone_from_slice(&qm31[len - 2..]);
+        Poseidon2HalfVar::permute_get_rate(&Poseidon2HalfVar::zero(&cs), &digest)
+    }
 
-            let left = Poseidon2HalfVar::from_qm31(&input[0], &input[1]);
-            digest = Poseidon2HalfVar::permute_get_rate(&left, &digest);
-        } else {
-            let mut input: [QM31Var; 2] = std::array::from_fn(|_| QM31Var::zero(&cs));
-            input[0..remain].clone_from_slice(&qm31[len - remain..]);
-
-            let left = Poseidon2HalfVar::from_qm31(&input[0], &input[1]);
-            digest = Poseidon2HalfVar::permute_get_rate(&left, &digest);
-        }
-
-        digest
+    pub fn hash_qm31_columns_get_rate(qm31: &[QM31Var]) -> Poseidon2HalfVar {
+        let cs = qm31[0].cs();
+        let digest = Self::hash_qm31_columns_get_capacity(qm31);
+        Poseidon2HalfVar::permute_get_rate(&Poseidon2HalfVar::zero(&cs), &digest)
     }
 
     pub fn hash_qm31_columns_get_capacity(qm31: &[QM31Var]) -> Poseidon2HalfVar {
