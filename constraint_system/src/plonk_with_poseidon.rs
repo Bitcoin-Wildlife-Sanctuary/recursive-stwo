@@ -158,7 +158,7 @@ impl PlonkWithPoseidonConstraintSystem {
 
         self.is_program_started = true;
 
-        let poseidon_wire = self.poseidon_wire.len() + 1;
+        let poseidon_wire = c_wire;
 
         self.a_wire.push(a_wire);
         self.b_wire.push(b_wire);
@@ -452,6 +452,7 @@ impl PlonkWithPoseidonConstraintSystem {
             let r = mult_poseidon_vars[self.poseidon_wire[i]];
             if r != 0 {
                 mult_poseidon.push(r);
+                assert_eq!(counts[self.poseidon_wire[i]], 1);
                 mult_poseidon_vars[self.poseidon_wire[i]] = 0;
             } else {
                 mult_poseidon.push(0);
